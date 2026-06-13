@@ -23,6 +23,8 @@ const doopieOptionsEl = document.querySelector("#doopiecash-options");
 const smcOptionsEl = document.querySelector("#smc-options");
 const toastEl = document.querySelector("#toast");
 const equityChartEl = document.querySelector("#equity-chart");
+const monteCarloEl = document.querySelector("#monte-carlo");
+const mcStatsEl = document.querySelector("#mc-stats");
 const exportCsvEl = document.querySelector("#export-csv");
 const monthlyBodyEl = document.querySelector("#monthly-body");
 const adviceSectionEl = document.querySelector("#advice-section");
@@ -36,6 +38,7 @@ let chart;
 let candleSeries;
 let equityChart;
 let equitySeries;
+let mcSeries = [];
 let liveTimer;
 let toastTimer;
 let lastTrades = [];
@@ -303,6 +306,7 @@ function renderResult(result) {
   renderMetrics(result.metrics);
   renderLevels(result.levels);
   renderTrades(result.trades);
+  clearMonteCarlo();
   renderEquityCurve(result.trades);
   renderMonthlyBreakdown(result.trades);
   chart.timeScale().fitContent();
@@ -374,6 +378,90 @@ function renderEquityCurve(trades) {
   }
   equitySeries.setData(data);
   equityChart.timeScale().fitContent();
+}
+
+function clearMonteCarlo() {
+  for (const s of mcSeries) {
+    try { equityChart.removeSeries(s); } catch (_) {}
+  }
+  mcSeries = [];
+  if (mcStatsEl) mcStatsEl.classList.add("hidden");
+}
+
+function computeMonteCarlo(trades, iterations = 1000) {
+  if (trades.length < 3) return null;
+  const sorted = trades.slice().sort((a, b) => a.exitTime - b.exitTime);
+  const rValues = sorted.map(t => t.rMultiple);
+  const times = [];
+  let lastTime = 0;
+  for (const t of sorted) {
+    const time = Math.max(t.exitTime, lastTime + 1);
+    times.push(time);
+    lastTime = time;
+  }
+  const n = rValues.length;
+
+  // Build [iterations x n] cumulative-R matrix by shuffling R values
+  const allPaths = [];
+  for (let iter = 0; iter < iterations; iter++) {
+    const shuffled = rValues.slice().sort(() => Math.random() - 0.5);
+    const path = [];
+    let cum = 0;
+    for (const r of shuffled) {
+      cum = parseFloat((cum + r).toFixed(4));
+      path.push(cum);
+    }
+    allPaths.push(path);
+  }
+
+  // Per trade-index: percentile bands
+  const p5 = [], p50 = [], p95 = [];
+  for (let i = 0; i < n; i++) {
+    const col = allPaths.map(path => path[i]).sort((a, b) => a - b);
+    const time = times[i];
+    p5.push({ time, value: col[Math.floor(iterations * 0.05)] });
+    p50.push({ time, value: col[Math.floor(iterations * 0.50)] });
+    p95.push({ time, value: col[Math.floor(iterations * 0.95)] });
+  }
+
+  // Worst max drawdown in P5 path
+  let peak = 0, worstDd = 0;
+  for (const pt of p5) {
+    if (pt.value > peak) peak = pt.value;
+    const dd = peak - pt.value;
+    if (dd > worstDd) worstDd = dd;
+  }
+
+  return { p5, p50, p95, worstDd, p95End: p95.at(-1)?.value ?? 0 };
+}
+
+function renderMonteCarlo(trades) {
+  ensureEquityChart();
+  clearMonteCarlo();
+  const result = computeMonteCarlo(trades);
+  if (!result) return;
+
+  const lineSeries = (color, title) => equityChart.addLineSeries({
+    color,
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Dashed,
+    title,
+    lastValueVisible: true,
+    crosshairMarkerVisible: false,
+    priceFormat: { type: "custom", formatter: v => (v >= 0 ? "+" : "") + v.toFixed(2) + "R" }
+  });
+
+  const s95 = lineSeries("#4cc9b0", "P95");
+  const s50 = lineSeries("#93a1a8", "P50");
+  const s5  = lineSeries("#ff6b6b", "P5");
+  s95.setData(result.p95);
+  s50.setData(result.p50);
+  s5.setData(result.p5);
+  mcSeries = [s95, s50, s5];
+
+  mcStatsEl.textContent =
+    `Monte Carlo 1000× · P5 max drawdown: -${result.worstDd.toFixed(2)}R · P95 eindstand: +${result.p95End.toFixed(2)}R`;
+  mcStatsEl.classList.remove("hidden");
 }
 
 function renderMonthlyBreakdown(trades) {
@@ -789,6 +877,11 @@ tradingStyleEl.addEventListener("change", () => {
 });
 
 exportCsvEl.addEventListener("click", exportCsv);
+
+monteCarloEl.addEventListener("click", () => {
+  if (lastTrades.length < 3) return;
+  renderMonteCarlo(lastTrades);
+});
 
 refreshAdviceEl.addEventListener("click", async () => {
   try {
