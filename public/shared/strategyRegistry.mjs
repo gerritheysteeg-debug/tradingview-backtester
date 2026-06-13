@@ -1,5 +1,6 @@
 import { runSupportResistanceBacktest } from "./supportResistance.mjs";
 import { runDoopiecashNakedPriceActionBacktest } from "./doopiecashNakedPriceAction.mjs";
+import { runLiquidityDrivenSMCBacktest } from "./liquidityDrivenSMC.mjs";
 
 export const STRATEGIES = [
   {
@@ -17,6 +18,15 @@ export const STRATEGIES = [
     chartResolution: "3m",
     levelResolution: "4h",
     run: runDoopiecashNakedPriceActionBacktest
+  },
+  {
+    id: "liquidity-driven-smc-v1",
+    name: "Liquidity Driven / SMC-lite v1",
+    description: "Stop hunts, sweeps, reclaims en CHOCH/BOS op 5 timeframes. Liquidity pools als entry-basis.",
+    requiredResolutions: ["1W", "1D", "4h", "15m", "3m"],
+    chartResolution: "3m",
+    levelResolution: "4h",
+    run: runLiquidityDrivenSMCBacktest
   }
 ];
 

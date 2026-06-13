@@ -19,6 +19,7 @@ const savePresetEl = document.querySelector("#save-preset");
 const deletePresetEl = document.querySelector("#delete-preset");
 const srOptionsEl = document.querySelector("#sr-options");
 const doopieOptionsEl = document.querySelector("#doopiecash-options");
+const smcOptionsEl = document.querySelector("#smc-options");
 const toastEl = document.querySelector("#toast");
 
 const PRESET_STORAGE_KEY = "tradingResearch.presets.v1";
@@ -54,9 +55,12 @@ function showToast(message) {
 }
 
 function updateStrategyOptions() {
-  const isDoopie = strategyEl.value === "doopiecash-naked-price-action-v1";
-  srOptionsEl.classList.toggle("hidden", isDoopie);
+  const id = strategyEl.value;
+  const isDoopie = id === "doopiecash-naked-price-action-v1";
+  const isSMC = id === "liquidity-driven-smc-v1";
+  srOptionsEl.classList.toggle("hidden", isDoopie || isSMC);
   doopieOptionsEl.classList.toggle("hidden", !isDoopie);
+  smcOptionsEl.classList.toggle("hidden", !isSMC);
 }
 
 function formPayload() {
@@ -67,14 +71,23 @@ function formPayload() {
     entryResolution: data.get("entryResolution"),
     levelResolution: data.get("levelResolution"),
     lookbackDays: Number(data.get("lookbackDays")),
-    options: {
-      volumeMultiplier: Number(data.get("volumeMultiplier")),
-      levelTolerancePct: Number(data.get("levelTolerancePct")),
-      direction: data.get("direction"),
-      stopMode: data.get("stopMode"),
-      maxLevelAgeDays: Number(data.get("maxLevelAgeDays") ?? 0),
-      minimumScoreToTrade: Number(data.get("minimumScoreToTrade") ?? 70)
-    }
+    options: resolveOptions(data)
+  };
+}
+
+function resolveOptions(data) {
+  const strategyId = data.get("strategyId");
+  const isSMC = strategyId === "liquidity-driven-smc-v1";
+  return {
+    volumeMultiplier: Number(data.get("volumeMultiplier")),
+    levelTolerancePct: Number(data.get("levelTolerancePct")),
+    direction: data.get("direction"),
+    stopMode: data.get("stopMode"),
+    maxLevelAgeDays: Number(data.get("maxLevelAgeDays") ?? 0),
+    minimumScoreToTrade: isSMC
+      ? Number(data.get("smcMinimumScoreToTrade") ?? 65)
+      : Number(data.get("minimumScoreToTrade") ?? 70),
+    entryModel: data.get("entryModel") ?? "balanced"
   };
 }
 
@@ -93,7 +106,9 @@ function currentPresetValues() {
     direction: data.get("direction"),
     stopMode: data.get("stopMode"),
     maxLevelAgeDays: Number(data.get("maxLevelAgeDays") ?? 0),
-    minimumScoreToTrade: Number(data.get("minimumScoreToTrade") ?? 70)
+    minimumScoreToTrade: Number(data.get("minimumScoreToTrade") ?? 70),
+    smcMinimumScoreToTrade: Number(data.get("smcMinimumScoreToTrade") ?? 65),
+    entryModel: data.get("entryModel") ?? "balanced"
   };
 }
 
@@ -475,6 +490,8 @@ async function applyPresetValues(values) {
   form.elements.levelTolerancePct.value = values.levelTolerancePct ?? 0.35;
   form.elements.maxLevelAgeDays.value = values.maxLevelAgeDays ?? 0;
   form.elements.minimumScoreToTrade.value = values.minimumScoreToTrade ?? 70;
+  form.elements.smcMinimumScoreToTrade.value = values.smcMinimumScoreToTrade ?? 65;
+  setSelectValue(form.elements.entryModel, values.entryModel ?? "balanced");
   updateStrategyOptions();
   await loadInstruments({ preferredInstrument: values.instrument ?? "BTC-PERPETUAL" });
 }
@@ -504,7 +521,9 @@ function formatInstrumentLabel(instrument) {
 function formatStopMode(mode) {
   if (mode === "structure") return "Structure";
   if (mode === "swing_fallback") return "Swing fallback";
-  return mode === "level2" ? "Level 2" : "Swing";
+  if (mode === "sweep") return "Sweep low/high";
+  if (mode === "level2") return "Level 2";
+  return mode === "swing" ? "Swing" : (mode ?? "-");
 }
 
 function formatPrice(value) {

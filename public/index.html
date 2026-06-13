@@ -132,6 +132,23 @@
             </label>
           </div>
 
+          <div id="smc-options" class="hidden">
+            <div class="field-grid">
+              <label>
+                Entry model
+                <select id="entry-model" name="entryModel">
+                  <option value="balanced" selected>Balanced</option>
+                  <option value="conservative">Conservative</option>
+                  <option value="aggressive">Aggressive</option>
+                </select>
+              </label>
+              <label>
+                Min. score
+                <input id="smc-min-score" name="smcMinimumScoreToTrade" type="number" min="0" max="100" step="5" value="65">
+              </label>
+            </div>
+          </div>
+
           <button class="primary-button" type="submit">
             Run backtest
           </button>
