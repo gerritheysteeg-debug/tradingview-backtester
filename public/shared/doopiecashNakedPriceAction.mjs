@@ -735,50 +735,58 @@ export function scanDoopiecashNakedPriceAction({ entryCandles, levelCandles, can
 
   if (supports.length && config.direction !== "short") {
     const zone = supports[0];
-    const stop = round(zone.price * (1 - config.stopBufferPct / 100), 1);
+    // Stop at next zone below, or 0.7% fixed — stopBufferPct (0.05) is too tight for zone-based entries
+    const stopRef = supports[1]?.price ?? zone.price * (1 - 0.7 / 100);
+    const stop = round(stopRef * (1 - config.stopBufferPct / 100), 1);
     const risk = zone.price - stop;
     const tp3 = resistances[0]?.price ?? zone.price + risk * 3;
     const biasScore = (dailyBias === "long" ? 35 : dailyBias === "neutral" ? 15 : 0) + (weeklyBias === "long" ? 20 : weeklyBias === "neutral" ? 10 : 0);
     const dist = round((currentPrice - zone.price) / currentPrice * 100, 2);
     const proximity = (currentPrice - zone.price) / tol;
 
-    setups.push({
-      direction: "long",
-      status: proximity <= 4 ? "watch" : "pending",
-      entryPrice: round(zone.price, 1),
-      stopPrice: stop,
-      tp1: round(zone.price + risk, 1),
-      tp2: round(zone.price + risk * 2, 1),
-      tp3: round(tp3, 1),
-      score: Math.min(100, biasScore + 25 + (zone.fresh ? 15 : 5)),
-      rr: round(risk > 0 ? (tp3 - zone.price) / risk : 0, 2),
-      description: `Dagelijkse bias: ${doopBiasFmt(dailyBias)} · ${zone.touches} touches · H4 demand`,
-      distance: `${dist}% onder prijs`
-    });
+    if (risk > 0) {
+      setups.push({
+        direction: "long",
+        status: proximity <= 4 ? "watch" : "pending",
+        entryPrice: round(zone.price, 1),
+        stopPrice: stop,
+        tp1: round(zone.price + risk, 1),
+        tp2: round(zone.price + risk * 2, 1),
+        tp3: round(tp3, 1),
+        score: Math.min(100, biasScore + 25 + (zone.fresh ? 15 : 5)),
+        rr: round((tp3 - zone.price) / risk, 2),
+        description: `Dagelijkse bias: ${doopBiasFmt(dailyBias)} · ${zone.touches} touches · H4 demand`,
+        distance: `${dist}% onder prijs`
+      });
+    }
   }
 
   if (resistances.length && config.direction !== "long") {
     const zone = resistances[0];
-    const stop = round(zone.price * (1 + config.stopBufferPct / 100), 1);
+    // Stop at next zone above, or 0.7% fixed
+    const stopRef = resistances[1]?.price ?? zone.price * (1 + 0.7 / 100);
+    const stop = round(stopRef * (1 + config.stopBufferPct / 100), 1);
     const risk = stop - zone.price;
     const tp3 = supports[0]?.price ?? zone.price - risk * 3;
     const biasScore = (dailyBias === "short" ? 35 : dailyBias === "neutral" ? 15 : 0) + (weeklyBias === "short" ? 20 : weeklyBias === "neutral" ? 10 : 0);
     const dist = round((zone.price - currentPrice) / currentPrice * 100, 2);
     const proximity = (zone.price - currentPrice) / tol;
 
-    setups.push({
-      direction: "short",
-      status: proximity <= 4 ? "watch" : "pending",
-      entryPrice: round(zone.price, 1),
-      stopPrice: stop,
-      tp1: round(zone.price - risk, 1),
-      tp2: round(zone.price - risk * 2, 1),
-      tp3: round(tp3, 1),
-      score: Math.min(100, biasScore + 25 + (zone.fresh ? 15 : 5)),
-      rr: round(risk > 0 ? (zone.price - tp3) / risk : 0, 2),
-      description: `Dagelijkse bias: ${doopBiasFmt(dailyBias)} · ${zone.touches} touches · H4 supply`,
-      distance: `${dist}% boven prijs`
-    });
+    if (risk > 0) {
+      setups.push({
+        direction: "short",
+        status: proximity <= 4 ? "watch" : "pending",
+        entryPrice: round(zone.price, 1),
+        stopPrice: stop,
+        tp1: round(zone.price - risk, 1),
+        tp2: round(zone.price - risk * 2, 1),
+        tp3: round(tp3, 1),
+        score: Math.min(100, biasScore + 25 + (zone.fresh ? 15 : 5)),
+        rr: round((zone.price - tp3) / risk, 2),
+        description: `Dagelijkse bias: ${doopBiasFmt(dailyBias)} · ${zone.touches} touches · H4 supply`,
+        distance: `${dist}% boven prijs`
+      });
+    }
   }
 
   return { setups, currentPrice };

@@ -674,48 +674,56 @@ export function scanLiquidityDrivenSMC({ entryCandles, levelCandles, candlesByRe
 
   if (sellSideBelow.length && config.direction !== "short") {
     const pool = sellSideBelow[0];
-    const stop = round(pool.level * (1 - config.stopBufferPct / 100), 1);
-    const risk = currentPrice - stop;
-    const tp3 = buySideAbove[0]?.level ?? currentPrice + risk * 3;
+    // Entry AFTER sweep+reclaim ≈ at pool level. Stop 0.5% below pool (sweep wick buffer).
+    const entry = round(pool.level, 1);
+    const stop = round(pool.level * (1 - 0.5 / 100), 1);
+    const risk = entry - stop;
+    const tp3 = buySideAbove[0]?.level ?? entry + risk * 3;
     const dist = round((currentPrice - pool.level) / currentPrice * 100, 2);
     const biasBonus = d1Bias === "long" ? 20 : d1Bias === "neutral" ? 10 : 0;
 
-    setups.push({
-      direction: "long",
-      status: "watch",
-      entryPrice: round(currentPrice, 1),
-      stopPrice: stop,
-      tp1: round(currentPrice + risk, 1),
-      tp2: round(currentPrice + risk * 2, 1),
-      tp3: round(tp3, 1),
-      score: Math.min(100, 40 + Math.round(pool.strength * 4) + biasBonus),
-      rr: round(risk > 0 ? (tp3 - currentPrice) / risk : 0, 2),
-      description: `${smcPoolFmt(pool.type)} @ ${round(pool.level, 1)} · wacht op sweep & reclaim · D1: ${smcBiasFmt(d1Bias)}`,
-      distance: `Liquiditeitspool ${dist}% onder prijs`
-    });
+    if (risk > 0) {
+      setups.push({
+        direction: "long",
+        status: "watch",
+        entryPrice: entry,
+        stopPrice: stop,
+        tp1: round(entry + risk, 1),
+        tp2: round(entry + risk * 2, 1),
+        tp3: round(tp3, 1),
+        score: Math.min(100, 40 + Math.round(pool.strength * 4) + biasBonus),
+        rr: round((tp3 - entry) / risk, 2),
+        description: `${smcPoolFmt(pool.type)} @ ${round(pool.level, 1)} · wacht op sweep & reclaim · D1: ${smcBiasFmt(d1Bias)}`,
+        distance: `Liquiditeitspool ${dist}% onder prijs`
+      });
+    }
   }
 
   if (buySideAbove.length && config.direction !== "long") {
     const pool = buySideAbove[0];
-    const stop = round(pool.level * (1 + config.stopBufferPct / 100), 1);
-    const risk = stop - currentPrice;
-    const tp3 = sellSideBelow[0]?.level ?? currentPrice - risk * 3;
+    // Entry AFTER sweep+reclaim ≈ at pool level. Stop 0.5% above pool.
+    const entry = round(pool.level, 1);
+    const stop = round(pool.level * (1 + 0.5 / 100), 1);
+    const risk = stop - entry;
+    const tp3 = sellSideBelow[0]?.level ?? entry - risk * 3;
     const dist = round((pool.level - currentPrice) / currentPrice * 100, 2);
     const biasBonus = d1Bias === "short" ? 20 : d1Bias === "neutral" ? 10 : 0;
 
-    setups.push({
-      direction: "short",
-      status: "watch",
-      entryPrice: round(currentPrice, 1),
-      stopPrice: stop,
-      tp1: round(currentPrice - risk, 1),
-      tp2: round(currentPrice - risk * 2, 1),
-      tp3: round(tp3, 1),
-      score: Math.min(100, 40 + Math.round(pool.strength * 4) + biasBonus),
-      rr: round(risk > 0 ? (currentPrice - tp3) / risk : 0, 2),
-      description: `${smcPoolFmt(pool.type)} @ ${round(pool.level, 1)} · wacht op sweep & reclaim · D1: ${smcBiasFmt(d1Bias)}`,
-      distance: `Liquiditeitspool ${dist}% boven prijs`
-    });
+    if (risk > 0) {
+      setups.push({
+        direction: "short",
+        status: "watch",
+        entryPrice: entry,
+        stopPrice: stop,
+        tp1: round(entry - risk, 1),
+        tp2: round(entry - risk * 2, 1),
+        tp3: round(tp3, 1),
+        score: Math.min(100, 40 + Math.round(pool.strength * 4) + biasBonus),
+        rr: round((entry - tp3) / risk, 2),
+        description: `${smcPoolFmt(pool.type)} @ ${round(pool.level, 1)} · wacht op sweep & reclaim · D1: ${smcBiasFmt(d1Bias)}`,
+        distance: `Liquiditeitspool ${dist}% boven prijs`
+      });
+    }
   }
 
   return { setups, currentPrice };

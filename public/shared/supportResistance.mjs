@@ -530,23 +530,24 @@ export function scanSupportResistance({ entryCandles, levelCandles, options = {}
 
   if (supports.length && config.direction !== "short") {
     const level = supports[0];
-    const stopResult = resolveStop({ candles: entryCandles, index: lastIndex, levels, level, direction: "long", config });
-    if (stopResult) {
-      const stop = stopResult.price;
-      const risk = level.price - stop;
-      const tp3 = resistances[0]?.price ?? level.price + risk * 3;
-      const dist = round((currentPrice - level.price) / currentPrice * 100, 2);
-      const proximity = (currentPrice - level.price) / tol;
+    // Stop at next support below entry, or 1% fixed buffer — NOT current swing (entry not reached yet)
+    const stopRef = supports[1]?.price ?? level.price * (1 - 1.0 / 100);
+    const stop = round(stopRef * (1 - config.stopBufferPct / 100), 1);
+    const risk = level.price - stop;
+    const tp3 = resistances[0]?.price ?? level.price + risk * 3;
+    const dist = round((currentPrice - level.price) / currentPrice * 100, 2);
+    const proximity = (currentPrice - level.price) / tol;
+    if (risk > 0) {
       setups.push({
         direction: "long",
         status: proximity <= 4 ? "watch" : "pending",
         entryPrice: round(level.price, 1),
-        stopPrice: round(stop, 1),
+        stopPrice: stop,
         tp1: round(level.price + risk, 1),
         tp2: round(level.price + risk * 2, 1),
         tp3: round(tp3, 1),
         score: Math.min(100, Math.round(level.strength * 8)),
-        rr: round(risk > 0 ? (tp3 - level.price) / risk : 0, 2),
+        rr: round((tp3 - level.price) / risk, 2),
         description: `${level.type} · ${level.touches} touches`,
         distance: `${dist}% onder prijs`
       });
@@ -555,23 +556,24 @@ export function scanSupportResistance({ entryCandles, levelCandles, options = {}
 
   if (resistances.length && config.direction !== "long") {
     const level = resistances[0];
-    const stopResult = resolveStop({ candles: entryCandles, index: lastIndex, levels, level, direction: "short", config });
-    if (stopResult) {
-      const stop = stopResult.price;
-      const risk = stop - level.price;
-      const tp3 = supports[0]?.price ?? level.price - risk * 3;
-      const dist = round((level.price - currentPrice) / currentPrice * 100, 2);
-      const proximity = (level.price - currentPrice) / tol;
+    // Stop at next resistance above entry, or 1% fixed buffer
+    const stopRef = resistances[1]?.price ?? level.price * (1 + 1.0 / 100);
+    const stop = round(stopRef * (1 + config.stopBufferPct / 100), 1);
+    const risk = stop - level.price;
+    const tp3 = supports[0]?.price ?? level.price - risk * 3;
+    const dist = round((level.price - currentPrice) / currentPrice * 100, 2);
+    const proximity = (level.price - currentPrice) / tol;
+    if (risk > 0) {
       setups.push({
         direction: "short",
         status: proximity <= 4 ? "watch" : "pending",
         entryPrice: round(level.price, 1),
-        stopPrice: round(stop, 1),
+        stopPrice: stop,
         tp1: round(level.price - risk, 1),
         tp2: round(level.price - risk * 2, 1),
         tp3: round(tp3, 1),
         score: Math.min(100, Math.round(level.strength * 8)),
-        rr: round(risk > 0 ? (level.price - tp3) / risk : 0, 2),
+        rr: round((level.price - tp3) / risk, 2),
         description: `${level.type} · ${level.touches} touches`,
         distance: `${dist}% boven prijs`
       });
