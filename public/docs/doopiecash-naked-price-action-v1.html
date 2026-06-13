@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Doopiecash Naked Price Action v1 — Strategie documentatie</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { padding: 32px; max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .tag { display: inline-block; background: var(--surface-2); border-radius: 4px; padding: 2px 8px; font-size: 12px; color: var(--muted); margin-right: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+    th { color: var(--muted); font-weight: 500; }
+    .step { display: flex; gap: 12px; margin: 8px 0; }
+    .step-num { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-2); color: #000; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+    .back { display: inline-block; margin-bottom: 24px; font-size: 13px; color: var(--accent-2); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <a class="back" href="javascript:history.back()">← Terug</a>
+  <h1>Doopiecash Naked Price Action v1</h1>
+  <p style="color:var(--muted);margin-bottom:16px;">Top-down price action · Marktstructuur · Geen indicatoren</p>
+  <span class="tag">Price Action</span>
+  <span class="tag">Multi-timeframe</span>
+  <span class="tag">Sniper entry</span>
+
+  <h2 style="margin-top:24px;font-size:15px;">Wanneer gebruiken?</h2>
+  <p style="font-size:13px;">Gebruik bij een duidelijke directional bias op hogere timeframes of een nette reversal-setup vanuit een HTF zone. Core discretionary-style strategie gebaseerd op pure marktstructuur.</p>
+
+  <h2 style="margin-top:24px;font-size:15px;">Timeframes (top-down)</h2>
+  <table>
+    <tr><th>Timeframe</th><th>Rol</th></tr>
+    <tr><td>1W</td><td>Macro bias · major swing structuur</td></tr>
+    <tr><td>1D</td><td>Daily trend richting · zone identificatie</td></tr>
+    <tr><td>4H</td><td>Setup zone · rejection of reclaim</td></tr>
+    <tr><td>15m</td><td>Triggerzone · BOS bevestiging</td></tr>
+    <tr><td>3m</td><td>Sniper entry · engulfing of reclaim candle</td></tr>
+  </table>
+
+  <h2 style="margin-top:24px;font-size:15px;">Setup stappen</h2>
+  <div class="step"><div class="step-num">1</div><div style="font-size:13px;">Weekly + Daily geven duidelijke bias (bullish of bearish marktstructuur).</div></div>
+  <div class="step"><div class="step-num">2</div><div style="font-size:13px;">4H zone identificeren: OB, FVG, supply/demand of naked level.</div></div>
+  <div class="step"><div class="step-num">3</div><div style="font-size:13px;">15m trigger: candle close die de zone bevestigt (rejection of reclaim).</div></div>
+  <div class="step"><div class="step-num">4</div><div style="font-size:13px;">3m entry op BOS, engulfing of continuation candle.</div></div>
+
+  <h2 style="margin-top:24px;font-size:15px;">Stop &amp; Targets</h2>
+  <table>
+    <tr><th>Niveau</th><th>Omschrijving</th></tr>
+    <tr><td>Stop</td><td>Voorbij de 4H zone (swing low/high)</td></tr>
+    <tr><td>TP1</td><td>Vorige 15m/4H swing</td></tr>
+    <tr><td>TP2</td><td>Daily liquidity / HTF zone</td></tr>
+    <tr><td>TP3</td><td>Weekly target of trail</td></tr>
+  </table>
+
+  <h2 style="margin-top:24px;font-size:15px;">Niet gebruiken bij</h2>
+  <ul style="font-size:13px;line-height:1.8;">
+    <li>Smalle chop of consolidatie zonder duidelijke zones</li>
+    <li>Lage liquiditeit (weekend, pre-markt)</li>
+    <li>Conflicterende bias tussen Weekly en Daily</li>
+  </ul>
+</body>
+</html>

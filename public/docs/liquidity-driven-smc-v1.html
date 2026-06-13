@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Liquidity Driven / SMC-lite v1 — Strategie documentatie</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { padding: 32px; max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .tag { display: inline-block; background: var(--surface-2); border-radius: 4px; padding: 2px 8px; font-size: 12px; color: var(--muted); margin-right: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+    th { color: var(--muted); font-weight: 500; }
+    .step { display: flex; gap: 12px; margin: 8px 0; }
+    .step-num { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-2); color: #000; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+    .back { display: inline-block; margin-bottom: 24px; font-size: 13px; color: var(--accent-2); text-decoration: none; }
+    .note { background: var(--surface-2); border-left: 3px solid var(--accent-2); padding: 12px 16px; border-radius: 0 6px 6px 0; font-size: 13px; margin: 16px 0; }
+  </style>
+</head>
+<body>
+  <a class="back" href="javascript:history.back()">← Terug</a>
+  <h1>Liquidity Driven / SMC-lite v1</h1>
+  <p style="color:var(--muted);margin-bottom:16px;">Stop hunts · Liquidity sweeps · CHOCH/BOS · Sniper entries</p>
+  <span class="tag">SMC</span>
+  <span class="tag">Liquidity</span>
+  <span class="tag">Hoge RR</span>
+
+  <h2 style="margin-top:24px;font-size:15px;">Wanneer gebruiken?</h2>
+  <p style="font-size:13px;">Gebruik bij range-markten, equal highs/lows, stop hunts en failed breakouts. Deze strategie zoekt naar plekken waar retail-stops liggen en handelt de omgekeerde beweging na een sweep.</p>
+
+  <div class="note">
+    De beste setups ontstaan nadat de markt een duidelijke liquidity pool heeft geswept en vervolgens terugkeert — dit is het moment van minimale retail-betrokkenheid en maximale institutionele interest.
+  </div>
+
+  <h2 style="margin-top:24px;font-size:15px;">Timeframes</h2>
+  <table>
+    <tr><th>Timeframe</th><th>Rol</th></tr>
+    <tr><td>1W / 1D</td><td>Major liquidity pools · macro swing structuur</td></tr>
+    <tr><td>4H</td><td>Liquidity pool identificatie · CHOCH detectie</td></tr>
+    <tr><td>15m</td><td>Sweep bevestiging · reclaim candle</td></tr>
+    <tr><td>3m</td><td>Entry na BOS of engulfing na sweep</td></tr>
+  </table>
+
+  <h2 style="margin-top:24px;font-size:15px;">Setup stappen</h2>
+  <div class="step"><div class="step-num">1</div><div style="font-size:13px;">Identificeer liquidity pool: equal highs/lows, swing punt met veel stops.</div></div>
+  <div class="step"><div class="step-num">2</div><div style="font-size:13px;">Prijs sweeped de pool (wick of candle close voorbij het niveau).</div></div>
+  <div class="step"><div class="step-num">3</div><div style="font-size:13px;">Reclaim: prijs keert terug binnen de range → CHOCH of BOS op 15m.</div></div>
+  <div class="step"><div class="step-num">4</div><div style="font-size:13px;">3m entry op bevestigingscandle na de reclaim.</div></div>
+
+  <h2 style="margin-top:24px;font-size:15px;">Stop &amp; Targets</h2>
+  <table>
+    <tr><th>Niveau</th><th>Omschrijving</th></tr>
+    <tr><td>Stop</td><td>Voorbij het sweep-punt (wick high/low + buffer)</td></tr>
+    <tr><td>TP1</td><td>Vorige 4H swing aan de andere kant</td></tr>
+    <tr><td>TP2</td><td>Volgende liquidity pool / HTF zone</td></tr>
+    <tr><td>TP3</td><td>Daily target of trail</td></tr>
+  </table>
+
+  <h2 style="margin-top:24px;font-size:15px;">Niet gebruiken bij</h2>
+  <ul style="font-size:13px;line-height:1.8;">
+    <li>Markt zonder duidelijke liquidity pools (te weinig swings)</li>
+    <li>Sterke trending markt zonder pullbacks</li>
+    <li>Directe breakout zonder sweep-confirmation</li>
+  </ul>
+</body>
+</html>

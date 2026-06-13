@@ -20,20 +20,19 @@
 
         <form id="control-form" class="control-form">
           <label>
-            Handelsstijl
-            <select id="trading-style">
-              <option value="swing">Swing trading</option>
-              <option value="day" selected>Day trading</option>
-              <option value="scalping">Scalping</option>
-            </select>
-          </label>
-
-          <label>
             Strategie
             <select id="strategy" name="strategyId">
               <option value="support-resistance-v1" selected>Support / Resistance v1</option>
+              <option value="doopiecash-naked-price-action-v1">Doopiecash Naked Price Action v1</option>
+              <option value="liquidity-driven-smc-v1">Liquidity Driven / SMC-lite v1</option>
+              <option value="trend-pullback-v1">Trend Pullback v1</option>
+              <option value="volatility-expansion-v1">Volatility Expansion v1</option>
+              <option value="market-regime-engine-v1">Market Regime Engine v1</option>
             </select>
           </label>
+          <div id="strategy-doc-link" class="strategy-doc-link hidden">
+            <a id="strategy-doc-anchor" href="#" target="_blank" rel="noopener">↗ Meer info over deze strategie</a>
+          </div>
 
           <section class="control-group">
             <label>
@@ -185,7 +184,20 @@
         <section class="metrics" id="metrics"></section>
 
         <section id="advice-section" class="advice-section hidden">
-          <div id="advice-cards" class="advice-cards"></div>
+          <div class="advice-styles">
+            <div class="advice-style-col" id="advice-swing">
+              <div class="advice-style-label">Swing</div>
+              <div class="advice-cards" id="advice-cards-swing"></div>
+            </div>
+            <div class="advice-style-col" id="advice-day">
+              <div class="advice-style-label">Day</div>
+              <div class="advice-cards" id="advice-cards-day"></div>
+            </div>
+            <div class="advice-style-col" id="advice-scalp">
+              <div class="advice-style-label">Scalp</div>
+              <div class="advice-cards" id="advice-cards-scalp"></div>
+            </div>
+          </div>
           <div class="advice-updated"><span id="advice-time"></span></div>
         </section>
 

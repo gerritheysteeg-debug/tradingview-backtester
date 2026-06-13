@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trend Pullback v1 — Strategie documentatie</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { padding: 32px; max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .tag { display: inline-block; background: var(--surface-2); border-radius: 4px; padding: 2px 8px; font-size: 12px; color: var(--muted); margin-right: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+    th { color: var(--muted); font-weight: 500; }
+    .step { display: flex; gap: 12px; margin: 8px 0; }
+    .step-num { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-2); color: #000; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+    .back { display: inline-block; margin-bottom: 24px; font-size: 13px; color: var(--accent-2); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <a class="back" href="javascript:history.back()">← Terug</a>
+  <h1>Trend Pullback v1</h1>
+  <p style="color:var(--muted);margin-bottom:16px;">Continuation strategy · Daily trend + 4H pullback</p>
+  <span class="tag">Trend</span>
+  <span class="tag">Continuation</span>
+  <span class="tag">Multi-timeframe</span>
+
+  <h2 style="margin-top:24px;font-size:15px;">Wanneer gebruiken?</h2>
+  <p style="font-size:13px;">Gebruik deze strategie wanneer er een duidelijke Daily trend aanwezig is (HH-HL of LH-LL structuur + EMA50 filter) en de prijs pullback maakt naar een 4H swing level.</p>
+
+  <h2 style="margin-top:24px;font-size:15px;">Timeframes</h2>
+  <table>
+    <tr><th>Timeframe</th><th>Rol</th></tr>
+    <tr><td>1D</td><td>Trend bias · EMA50 · swing structuur</td></tr>
+    <tr><td>4H</td><td>Pullback zone · Higher Low / Lower High</td></tr>
+    <tr><td>15m</td><td>Trigger: zone reclaim of rejection candle</td></tr>
+    <tr><td>3m</td><td>Execution entry (BOS, engulfing)</td></tr>
+  </table>
+
+  <h2 style="margin-top:24px;font-size:15px;">Setup stappen (long)</h2>
+  <div class="step"><div class="step-num">1</div><div style="font-size:13px;">Daily trend is bullish: HH-HL patroon zichtbaar, prijs boven EMA50.</div></div>
+  <div class="step"><div class="step-num">2</div><div style="font-size:13px;">4H pullback naar een eerder Higher Low (HL) zone.</div></div>
+  <div class="step"><div class="step-num">3</div><div style="font-size:13px;">15m candle sluit terug boven de zone (reclaim).</div></div>
+  <div class="step"><div class="step-num">4</div><div style="font-size:13px;">3m entry op BOS of engulfing candle vanuit de zone.</div></div>
+
+  <h2 style="margin-top:24px;font-size:15px;">Stop &amp; Targets</h2>
+  <table>
+    <tr><th>Niveau</th><th>Omschrijving</th></tr>
+    <tr><td>Stop</td><td>Onder de 4H pullback zone low (met buffer)</td></tr>
+    <tr><td>TP1</td><td>Vorige 4H swing high</td></tr>
+    <tr><td>TP2</td><td>Daily liquidity level</td></tr>
+    <tr><td>TP3</td><td>Trailing via 4H structure</td></tr>
+  </table>
+
+  <h2 style="margin-top:24px;font-size:15px;">Niet gebruiken bij</h2>
+  <ul style="font-size:13px;line-height:1.8;">
+    <li>Range markt of sideways consolidatie</li>
+    <li>Trendbreuk op daily (lower low)</li>
+    <li>Chop / te veel overlap tussen candles</li>
+  </ul>
+
+  <h2 style="margin-top:24px;font-size:15px;">Score opbouw</h2>
+  <table>
+    <tr><th>Component</th><th>Max score</th></tr>
+    <tr><td>Trend alignment (daily strength)</td><td>25</td></tr>
+    <tr><td>Zone kwaliteit</td><td>20</td></tr>
+    <tr><td>Pullback diepte</td><td>20</td></tr>
+    <tr><td>Entry kwaliteit</td><td>20</td></tr>
+    <tr><td>Risk/Reward (min 2:1)</td><td>15</td></tr>
+  </table>
+</body>
+</html>

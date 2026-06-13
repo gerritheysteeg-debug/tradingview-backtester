@@ -84,6 +84,22 @@ p {
   gap: 16px;
 }
 
+.strategy-doc-link {
+  margin-top: -10px;
+  font-size: 12px;
+}
+
+.strategy-doc-link a {
+  color: var(--accent-2);
+  text-decoration: none;
+  opacity: 0.85;
+}
+
+.strategy-doc-link a:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
 .control-group {
   display: grid;
   gap: 9px;
@@ -220,9 +236,38 @@ select:focus {
   gap: 6px;
 }
 
+.advice-styles {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+.advice-style-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.advice-style-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.advice-empty {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 8px 4px;
+  font-style: italic;
+}
+
 .advice-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 

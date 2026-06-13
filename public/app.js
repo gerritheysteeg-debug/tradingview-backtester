@@ -17,11 +17,14 @@ const presetSelectEl = document.querySelector("#preset-select");
 const presetNameEl = document.querySelector("#preset-name");
 const savePresetEl = document.querySelector("#save-preset");
 const deletePresetEl = document.querySelector("#delete-preset");
-const tradingStyleEl = document.querySelector("#trading-style");
 const srOptionsEl = document.querySelector("#sr-options");
 const doopieOptionsEl = document.querySelector("#doopiecash-options");
 const smcOptionsEl = document.querySelector("#smc-options");
+const strategyDocLinkEl = document.querySelector("#strategy-doc-link");
+const strategyDocAnchorEl = document.querySelector("#strategy-doc-anchor");
 const toastEl = document.querySelector("#toast");
+
+let _strategiesMeta = [];
 const equityChartEl = document.querySelector("#equity-chart");
 const monteCarloEl = document.querySelector("#monte-carlo");
 const mcStatsEl = document.querySelector("#mc-stats");
@@ -31,7 +34,9 @@ const correlationStatsEl = document.querySelector("#correlation-stats");
 const exportCsvEl = document.querySelector("#export-csv");
 const monthlyBodyEl = document.querySelector("#monthly-body");
 const adviceSectionEl = document.querySelector("#advice-section");
-const adviceCardsEl = document.querySelector("#advice-cards");
+const adviceCardsSwingEl = document.querySelector("#advice-cards-swing");
+const adviceCardsDayEl   = document.querySelector("#advice-cards-day");
+const adviceCardsScalpEl = document.querySelector("#advice-cards-scalp");
 const adviceTimeEl = document.querySelector("#advice-time");
 const refreshAdviceEl = document.querySelector("#refresh-advice");
 
@@ -59,18 +64,10 @@ const metricDefs = [
 ];
 
 const TRADING_STYLES = {
-  swing:   { entryResolution: "4h",  levelResolution: "1D",  lookbackDays: 180 },
-  day:     { entryResolution: "15m", levelResolution: "4h",  lookbackDays: 90  },
-  scalping:{ entryResolution: "3m",  levelResolution: "15m", lookbackDays: 14  }
+  swing: { entryResolution: "4h",  levelResolution: "1D",  lookbackDays: 180 },
+  day:   { entryResolution: "15m", levelResolution: "4h",  lookbackDays: 90  },
+  scalp: { entryResolution: "3m",  levelResolution: "15m", lookbackDays: 14  }
 };
-
-function applyTradingStyle(styleKey) {
-  const s = TRADING_STYLES[styleKey];
-  if (!s) return;
-  setSelectValue(document.querySelector("#entry-resolution"), s.entryResolution);
-  setSelectValue(document.querySelector("#level-resolution"), s.levelResolution);
-  document.querySelector("#lookback-days").value = s.lookbackDays;
-}
 
 function setStatus(message) {
   statusEl.textContent = message;
@@ -89,9 +86,18 @@ function updateStrategyOptions() {
   const id = strategyEl.value;
   const isDoopie = id === "doopiecash-naked-price-action-v1";
   const isSMC = id === "liquidity-driven-smc-v1";
-  srOptionsEl.classList.toggle("hidden", isDoopie || isSMC);
+  const isSROnly = id === "support-resistance-v1";
+  srOptionsEl.classList.toggle("hidden", !isSROnly);
   doopieOptionsEl.classList.toggle("hidden", !isDoopie);
   smcOptionsEl.classList.toggle("hidden", !isSMC);
+
+  const meta = _strategiesMeta.find(s => s.id === id);
+  if (meta?.docUrl && strategyDocLinkEl && strategyDocAnchorEl) {
+    strategyDocAnchorEl.href = meta.docUrl;
+    strategyDocLinkEl.classList.remove("hidden");
+  } else if (strategyDocLinkEl) {
+    strategyDocLinkEl.classList.add("hidden");
+  }
 }
 
 function formPayload() {
@@ -185,6 +191,7 @@ async function loadCurrencies() {
 async function loadStrategies() {
   try {
     const { strategies } = await getJson("/api/strategies");
+    _strategiesMeta = strategies;
     strategyEl.innerHTML = strategies
       .map(
         (strategy) =>
@@ -289,10 +296,9 @@ function ensureChart() {
 function renderResult(result) {
   ensureChart();
   strategyLabelEl.textContent = result.strategyName ?? result.strategy;
-  const styleLabel = tradingStyleEl.options[tradingStyleEl.selectedIndex]?.text ?? "";
   titleEl.textContent =
     `${result.instrumentName} · ${result.entryResolution} entries · ` +
-    `${result.levelResolution} levels · ${formatStopMode(result.options.stopMode)} · ${styleLabel}`;
+    `${result.levelResolution} levels · ${formatStopMode(result.options.stopMode)}`;
 
   candleSeries.setData(
     result.entryCandles.map((candle) => ({
@@ -618,17 +624,35 @@ function formatTimestamp(ts) {
 
 async function fetchAdvice() {
   const payload = formPayload();
-  const params = new URLSearchParams({
-    instrument: payload.instrumentName,
-    strategy: payload.strategyId,
-    lookbackDays: payload.lookbackDays,
-    entryResolution: payload.entryResolution ?? "15m",
-    levelResolution: payload.levelResolution ?? "4h",
-    options: JSON.stringify(payload.options)
-  });
   setStatus("Advies ophalen…");
-  const result = await getJson(`/api/next-entry?${params}`);
-  renderAdvice(result);
+
+  const scanFor = async (styleKey) => {
+    const style = TRADING_STYLES[styleKey];
+    const strategy = _strategiesMeta.find(s => s.id === payload.strategyId) ?? {};
+    const entryRes   = strategy.chartResolution  ?? style.entryResolution;
+    const levelRes   = strategy.levelResolution  ?? style.levelResolution;
+    const params = new URLSearchParams({
+      instrument:      payload.instrumentName,
+      strategy:        payload.strategyId,
+      lookbackDays:    style.lookbackDays,
+      entryResolution: entryRes,
+      levelResolution: levelRes,
+      options:         JSON.stringify(payload.options)
+    });
+    try {
+      return await getJson(`/api/next-entry?${params}`);
+    } catch {
+      return { setups: [], currentPrice: 0 };
+    }
+  };
+
+  const [swing, day, scalp] = await Promise.all([
+    scanFor("swing"),
+    scanFor("day"),
+    scanFor("scalp")
+  ]);
+
+  renderAdvice({ swing, day, scalp });
   setStatus(`Bijgewerkt ${new Date().toLocaleTimeString("nl-NL")}`);
 }
 
@@ -639,41 +663,44 @@ function clearAdviceLines() {
   adviceLines = [];
 }
 
-function renderAdvice(result) {
-  const { setups = [], currentPrice = 0, updatedAt } = result;
-  adviceSectionEl.classList.toggle("hidden", !setups.length);
-  if (!setups.length) { clearAdviceLines(); return; }
-
-  if (updatedAt) {
-    adviceTimeEl.textContent = `Bijgewerkt: ${new Date(updatedAt).toLocaleTimeString("nl-NL")}`;
-  }
-
-  adviceCardsEl.innerHTML = setups.map((setup) => {
-    const isLong = setup.direction === "long";
-    const dirLabel = isLong ? "▲ LONG" : "▼ SHORT";
-    const grade = setup.score >= 85 ? "A+" : setup.score >= 75 ? "A" : setup.score >= 65 ? "B" : "–";
-    return `
-      <div class="advice-card ${setup.direction}">
-        <div class="advice-header">
-          <span class="badge ${setup.status}">${statusLabel(setup.status)}</span>
-          <strong>${dirLabel}</strong>
-          <span class="advice-score">Score ${setup.score} · ${grade} · RR ${setup.rr}×</span>
-        </div>
-        <div class="advice-prices">
-          <div><small>Entry</small><strong>${formatPrice(setup.entryPrice)}</strong></div>
-          <div><small>Stop</small><strong class="negative">${formatPrice(setup.stopPrice)}</strong></div>
-          <div><small>TP1</small><strong class="positive">${formatPrice(setup.tp1)}</strong></div>
-          <div><small>TP2</small><strong class="positive">${formatPrice(setup.tp2)}</strong></div>
-          <div><small>TP3</small><strong class="positive">${formatPrice(setup.tp3)}</strong></div>
-        </div>
-        <small class="advice-desc">${escapeHtml(setup.description)} · ${escapeHtml(setup.distance)}</small>
+function setupCardHtml(setup) {
+  if (!setup) return `<div class="advice-empty">Geen setup</div>`;
+  const isLong = setup.direction === "long";
+  const dirLabel = isLong ? "▲ LONG" : "▼ SHORT";
+  const grade = setup.score >= 85 ? "A+" : setup.score >= 75 ? "A" : setup.score >= 65 ? "B" : "–";
+  return `
+    <div class="advice-card ${setup.direction}">
+      <div class="advice-header">
+        <span class="badge ${setup.status}">${statusLabel(setup.status)}</span>
+        <strong>${dirLabel}</strong>
+        <span class="advice-score">Score ${setup.score} · ${grade} · RR ${setup.rr}×</span>
       </div>
-    `;
-  }).join("");
+      <div class="advice-prices">
+        <div><small>Entry</small><strong>${formatPrice(setup.entryPrice)}</strong></div>
+        <div><small>Stop</small><strong class="negative">${formatPrice(setup.stopPrice)}</strong></div>
+        <div><small>TP1</small><strong class="positive">${formatPrice(setup.tp1)}</strong></div>
+        <div><small>TP2</small><strong class="positive">${formatPrice(setup.tp2)}</strong></div>
+        <div><small>TP3</small><strong class="positive">${formatPrice(setup.tp3)}</strong></div>
+      </div>
+      <small class="advice-desc">${escapeHtml(setup.description)} · ${escapeHtml(setup.distance)}</small>
+    </div>
+  `;
+}
+
+function renderAdvice({ swing, day, scalp }) {
+  const anySetup = swing.setups?.length || day.setups?.length || scalp.setups?.length;
+  adviceSectionEl.classList.toggle("hidden", !anySetup);
+  if (!anySetup) { clearAdviceLines(); return; }
+
+  adviceTimeEl.textContent = `Bijgewerkt: ${new Date().toLocaleTimeString("nl-NL")}`;
+
+  adviceCardsSwingEl.innerHTML = (swing.setups ?? []).map(setupCardHtml).join("") || `<div class="advice-empty">Geen setup</div>`;
+  adviceCardsDayEl.innerHTML   = (day.setups   ?? []).map(setupCardHtml).join("") || `<div class="advice-empty">Geen setup</div>`;
+  adviceCardsScalpEl.innerHTML = (scalp.setups ?? []).map(setupCardHtml).join("") || `<div class="advice-empty">Geen setup</div>`;
 
   if (!candleSeries) return;
   clearAdviceLines();
-  for (const setup of setups) {
+  for (const setup of [...(day.setups ?? [])].slice(0, 1)) {
     const isLong = setup.direction === "long";
     adviceLines.push(
       candleSeries.createPriceLine({ price: setup.entryPrice, color: "#ffffff", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, title: `Entry ${setup.direction}`, axisLabelVisible: true }),
@@ -929,7 +956,6 @@ function escapeHtml(value) {
 }
 
 async function initialize() {
-  applyTradingStyle(tradingStyleEl.value);
   renderPresetOptions();
   await loadStrategies();
   await loadCurrencies();
@@ -951,10 +977,6 @@ kindEl.addEventListener("change", () => {
 });
 
 strategyEl.addEventListener("change", updateStrategyOptions);
-
-tradingStyleEl.addEventListener("change", () => {
-  applyTradingStyle(tradingStyleEl.value);
-});
 
 exportCsvEl.addEventListener("click", exportCsv);
 

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Market Regime Engine v1 — Strategie documentatie</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { padding: 32px; max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .tag { display: inline-block; background: var(--surface-2); border-radius: 4px; padding: 2px 8px; font-size: 12px; color: var(--muted); margin-right: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+    th { color: var(--muted); font-weight: 500; }
+    .back { display: inline-block; margin-bottom: 24px; font-size: 13px; color: var(--accent-2); text-decoration: none; }
+    .regime { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; background: var(--surface-2); margin: 6px 0; font-size: 13px; }
+    .regime-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .note { background: var(--surface-2); border-left: 3px solid var(--accent-2); padding: 12px 16px; border-radius: 0 6px 6px 0; font-size: 13px; margin: 16px 0; }
+  </style>
+</head>
+<body>
+  <a class="back" href="javascript:history.back()">← Terug</a>
+  <h1>Market Regime Engine v1</h1>
+  <p style="color:var(--muted);margin-bottom:16px;">Meta-strategie · Geen directe entries · Bepaalt welke strategie geschikt is</p>
+  <span class="tag">Meta-filter</span>
+  <span class="tag">Regime detectie</span>
+  <span class="tag">ATR + structuur</span>
+
+  <div class="note">
+    De Market Regime Engine is geen entry-strategie. Het is een beslislaag die bepaalt welke andere strategie op dit moment actief mag zijn.
+  </div>
+
+  <h2 style="margin-top:24px;font-size:15px;">Regimes</h2>
+
+  <div class="regime"><div class="regime-dot" style="background:#4cc9b0"></div><div><strong>Trend</strong> — HH-HL of LH-LL structuur zichtbaar, EMA aligned → gebruik Trend Pullback of Doopiecash</div></div>
+  <div class="regime"><div class="regime-dot" style="background:#93a1a8"></div><div><strong>Range</strong> — prijs oscilleert tussen support en resistance, geen follow-through → gebruik Liquidity of S/R</div></div>
+  <div class="regime"><div class="regime-dot" style="background:#f0c040"></div><div><strong>Compressie</strong> — ATR valt sterk, range wordt smaller → wacht op breakout, gebruik Volatility Expansion klaar</div></div>
+  <div class="regime"><div class="regime-dot" style="background:#ff9f40"></div><div><strong>Expansie</strong> — momentum breakout actief → gebruik Volatility Expansion of Trend Pullback</div></div>
+  <div class="regime"><div class="regime-dot" style="background:#ff6b6b"></div><div><strong>Chop</strong> — rommelige markt, veel overlap, geen richting → geen trade aanbevolen</div></div>
+  <div class="regime"><div class="regime-dot" style="background:#9b7fcf"></div><div><strong>Uitputting</strong> — late trendfase met grote wicks en falende continuations → gebruik Liquidity voor reversal</div></div>
+
+  <h2 style="margin-top:24px;font-size:15px;">Routing tabel</h2>
+  <table>
+    <tr><th>Regime</th><th>Toegestane strategieën</th><th>Risk modifier</th></tr>
+    <tr><td>Trend</td><td>Trend Pullback, Doopiecash</td><td>1.0×</td></tr>
+    <tr><td>Range</td><td>Liquidity SMC, Support/Resistance</td><td>0.9×</td></tr>
+    <tr><td>Compressie</td><td>Volatility Expansion</td><td>0.75×</td></tr>
+    <tr><td>Expansie</td><td>Volatility Expansion, Trend Pullback</td><td>1.1×</td></tr>
+    <tr><td>Chop</td><td>Geen</td><td>0×</td></tr>
+    <tr><td>Uitputting</td><td>Liquidity SMC</td><td>0.8×</td></tr>
+  </table>
+
+  <h2 style="margin-top:24px;font-size:15px;">Hoe werkt de detectie?</h2>
+  <table>
+    <tr><th>Signaal</th><th>Hoe gemeten</th></tr>
+    <tr><td>ATR percentiel</td><td>Wilder ATR(14) t.o.v. 30-bars lookback window</td></tr>
+    <tr><td>Swing structuur</td><td>HH/HL en LH/LL tellen in recente swings</td></tr>
+    <tr><td>EMA alignment</td><td>Close vs EMA20 vs EMA50 op 4H</td></tr>
+    <tr><td>Bar overlap</td><td>Body-grootte t.o.v. range → chop indicator</td></tr>
+    <tr><td>Wicky bars</td><td>Wick/body ratio in laatste 5 bars → uitputting</td></tr>
+  </table>
+
+  <h2 style="margin-top:24px;font-size:15px;">Praktisch gebruik</h2>
+  <ol style="font-size:13px;line-height:1.9;padding-left:20px;">
+    <li>Run de Market Regime Engine als eerste op elke asset.</li>
+    <li>Lees het regime en de confidence score af (≥70% = betrouwbaar).</li>
+    <li>Kies vervolgens de aanbevolen strategie voor de backtest of advies.</li>
+    <li>Pas de positiegrootte aan via de risk modifier.</li>
+  </ol>
+
+  <div class="note">
+    De echte edge zit niet alleen in entries, maar in het <strong>vermijden van trades in het verkeerde regime</strong>.
+  </div>
+</body>
+</html>
