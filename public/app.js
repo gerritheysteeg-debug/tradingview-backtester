@@ -17,6 +17,7 @@ const presetSelectEl = document.querySelector("#preset-select");
 const presetNameEl = document.querySelector("#preset-name");
 const savePresetEl = document.querySelector("#save-preset");
 const deletePresetEl = document.querySelector("#delete-preset");
+const tradingStyleEl = document.querySelector("#trading-style");
 const srOptionsEl = document.querySelector("#sr-options");
 const doopieOptionsEl = document.querySelector("#doopiecash-options");
 const smcOptionsEl = document.querySelector("#smc-options");
@@ -50,6 +51,20 @@ const metricDefs = [
   ["averageScore", "Avg score"],
   ["maxDrawdownR", "Max DD R"]
 ];
+
+const TRADING_STYLES = {
+  swing:   { entryResolution: "4h",  levelResolution: "1D",  lookbackDays: 180 },
+  day:     { entryResolution: "15m", levelResolution: "4h",  lookbackDays: 90  },
+  scalping:{ entryResolution: "3m",  levelResolution: "15m", lookbackDays: 14  }
+};
+
+function applyTradingStyle(styleKey) {
+  const s = TRADING_STYLES[styleKey];
+  if (!s) return;
+  setSelectValue(document.querySelector("#entry-resolution"), s.entryResolution);
+  setSelectValue(document.querySelector("#level-resolution"), s.levelResolution);
+  document.querySelector("#lookback-days").value = s.lookbackDays;
+}
 
 function setStatus(message) {
   statusEl.textContent = message;
@@ -268,9 +283,10 @@ function ensureChart() {
 function renderResult(result) {
   ensureChart();
   strategyLabelEl.textContent = result.strategyName ?? result.strategy;
+  const styleLabel = tradingStyleEl.options[tradingStyleEl.selectedIndex]?.text ?? "";
   titleEl.textContent =
     `${result.instrumentName} · ${result.entryResolution} entries · ` +
-    `${result.levelResolution} levels · ${formatStopMode(result.options.stopMode)}`;
+    `${result.levelResolution} levels · ${formatStopMode(result.options.stopMode)} · ${styleLabel}`;
 
   candleSeries.setData(
     result.entryCandles.map((candle) => ({
@@ -745,6 +761,7 @@ function escapeHtml(value) {
 }
 
 async function initialize() {
+  applyTradingStyle(tradingStyleEl.value);
   renderPresetOptions();
   await loadStrategies();
   await loadCurrencies();
@@ -766,6 +783,10 @@ kindEl.addEventListener("change", () => {
 });
 
 strategyEl.addEventListener("change", updateStrategyOptions);
+
+tradingStyleEl.addEventListener("change", () => {
+  applyTradingStyle(tradingStyleEl.value);
+});
 
 exportCsvEl.addEventListener("click", exportCsv);
 
