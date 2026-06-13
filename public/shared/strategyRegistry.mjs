@@ -1,6 +1,6 @@
-import { runSupportResistanceBacktest } from "./supportResistance.mjs";
-import { runDoopiecashNakedPriceActionBacktest } from "./doopiecashNakedPriceAction.mjs";
-import { runLiquidityDrivenSMCBacktest } from "./liquidityDrivenSMC.mjs";
+import { runSupportResistanceBacktest, scanSupportResistance } from "./supportResistance.mjs";
+import { runDoopiecashNakedPriceActionBacktest, scanDoopiecashNakedPriceAction } from "./doopiecashNakedPriceAction.mjs";
+import { runLiquidityDrivenSMCBacktest, scanLiquidityDrivenSMC } from "./liquidityDrivenSMC.mjs";
 
 export const STRATEGIES = [
   {
@@ -8,7 +8,8 @@ export const STRATEGIES = [
     name: "Support / Resistance v1",
     description: "Higher-timeframe levels met candle close, volume-filter en swing/level2 stops.",
     requiredCandles: ["entry", "level"],
-    run: runSupportResistanceBacktest
+    run: runSupportResistanceBacktest,
+    scan: scanSupportResistance
   },
   {
     id: "doopiecash-naked-price-action-v1",
@@ -17,7 +18,8 @@ export const STRATEGIES = [
     requiredResolutions: ["1W", "1D", "4h", "15m", "3m"],
     chartResolution: "3m",
     levelResolution: "4h",
-    run: runDoopiecashNakedPriceActionBacktest
+    run: runDoopiecashNakedPriceActionBacktest,
+    scan: scanDoopiecashNakedPriceAction
   },
   {
     id: "liquidity-driven-smc-v1",
@@ -26,7 +28,8 @@ export const STRATEGIES = [
     requiredResolutions: ["1W", "1D", "4h", "15m", "3m"],
     chartResolution: "3m",
     levelResolution: "4h",
-    run: runLiquidityDrivenSMCBacktest
+    run: runLiquidityDrivenSMCBacktest,
+    scan: scanLiquidityDrivenSMC
   }
 ];
 
@@ -43,6 +46,12 @@ export function getStrategy(strategyId = "support-resistance-v1") {
     STRATEGIES.find((strategy) => strategy.id === strategyId) ??
     STRATEGIES[0]
   );
+}
+
+export function scanStrategy({ strategyId, entryCandles, levelCandles, candlesByResolution = {}, options = {} }) {
+  const strategy = getStrategy(strategyId);
+  if (!strategy.scan) return { setups: [], currentPrice: 0 };
+  return strategy.scan({ entryCandles, levelCandles, candlesByResolution, options });
 }
 
 export function runStrategyBacktest({

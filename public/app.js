@@ -24,6 +24,10 @@ const toastEl = document.querySelector("#toast");
 const equityChartEl = document.querySelector("#equity-chart");
 const exportCsvEl = document.querySelector("#export-csv");
 const monthlyBodyEl = document.querySelector("#monthly-body");
+const adviceSectionEl = document.querySelector("#advice-section");
+const adviceCardsEl = document.querySelector("#advice-cards");
+const adviceTimeEl = document.querySelector("#advice-time");
+const refreshAdviceEl = document.querySelector("#refresh-advice");
 
 const PRESET_STORAGE_KEY = "tradingResearch.presets.v1";
 
@@ -35,6 +39,7 @@ let liveTimer;
 let toastTimer;
 let lastTrades = [];
 let sortState = { col: null, asc: true };
+let adviceLines = [];
 
 const metricDefs = [
   ["trades", "Trades"],
@@ -427,6 +432,81 @@ function formatTimestamp(ts) {
   return new Date(ts * 1000).toISOString().replace("T", " ").slice(0, 16);
 }
 
+async function fetchAdvice() {
+  const payload = formPayload();
+  const params = new URLSearchParams({
+    instrument: payload.instrumentName,
+    strategy: payload.strategyId,
+    lookbackDays: payload.lookbackDays,
+    entryResolution: payload.entryResolution ?? "15m",
+    levelResolution: payload.levelResolution ?? "4h",
+    options: JSON.stringify(payload.options)
+  });
+  setStatus("Advies ophalen…");
+  const result = await getJson(`/api/next-entry?${params}`);
+  renderAdvice(result);
+  setStatus(`Bijgewerkt ${new Date().toLocaleTimeString("nl-NL")}`);
+}
+
+function clearAdviceLines() {
+  for (const line of adviceLines) {
+    try { candleSeries.removePriceLine(line); } catch {}
+  }
+  adviceLines = [];
+}
+
+function renderAdvice(result) {
+  const { setups = [], currentPrice = 0, updatedAt } = result;
+  adviceSectionEl.classList.toggle("hidden", !setups.length);
+  if (!setups.length) { clearAdviceLines(); return; }
+
+  if (updatedAt) {
+    adviceTimeEl.textContent = `Bijgewerkt: ${new Date(updatedAt).toLocaleTimeString("nl-NL")}`;
+  }
+
+  adviceCardsEl.innerHTML = setups.map((setup) => {
+    const isLong = setup.direction === "long";
+    const dirLabel = isLong ? "▲ LONG" : "▼ SHORT";
+    const grade = setup.score >= 85 ? "A+" : setup.score >= 75 ? "A" : setup.score >= 65 ? "B" : "–";
+    return `
+      <div class="advice-card ${setup.direction}">
+        <div class="advice-header">
+          <span class="badge ${setup.status}">${statusLabel(setup.status)}</span>
+          <strong>${dirLabel}</strong>
+          <span class="advice-score">Score ${setup.score} · ${grade} · RR ${setup.rr}×</span>
+        </div>
+        <div class="advice-prices">
+          <div><small>Entry</small><strong>${formatPrice(setup.entryPrice)}</strong></div>
+          <div><small>Stop</small><strong class="negative">${formatPrice(setup.stopPrice)}</strong></div>
+          <div><small>TP1</small><strong class="positive">${formatPrice(setup.tp1)}</strong></div>
+          <div><small>TP2</small><strong class="positive">${formatPrice(setup.tp2)}</strong></div>
+          <div><small>TP3</small><strong class="positive">${formatPrice(setup.tp3)}</strong></div>
+        </div>
+        <small class="advice-desc">${escapeHtml(setup.description)} · ${escapeHtml(setup.distance)}</small>
+      </div>
+    `;
+  }).join("");
+
+  if (!candleSeries) return;
+  clearAdviceLines();
+  for (const setup of setups) {
+    const isLong = setup.direction === "long";
+    adviceLines.push(
+      candleSeries.createPriceLine({ price: setup.entryPrice, color: "#ffffff", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, title: `Entry ${setup.direction}`, axisLabelVisible: true }),
+      candleSeries.createPriceLine({ price: setup.stopPrice, color: "#ff4040", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, title: "SL", axisLabelVisible: true }),
+      candleSeries.createPriceLine({ price: setup.tp1, color: isLong ? "#4cc9b0" : "#ff9966", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, title: "TP1", axisLabelVisible: false }),
+      candleSeries.createPriceLine({ price: setup.tp2, color: isLong ? "#4cc9b0" : "#ff9966", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, title: "TP2", axisLabelVisible: false }),
+      candleSeries.createPriceLine({ price: setup.tp3, color: "#d6ff62", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, title: "TP3", axisLabelVisible: true })
+    );
+  }
+}
+
+function statusLabel(status) {
+  if (status === "ready") return "Nu";
+  if (status === "watch") return "Let op";
+  return "Wacht";
+}
+
 function buildMarkers(trades) {
   const markers = [];
   const showLabels = trades.length <= 25;
@@ -688,6 +768,14 @@ kindEl.addEventListener("change", () => {
 strategyEl.addEventListener("change", updateStrategyOptions);
 
 exportCsvEl.addEventListener("click", exportCsv);
+
+refreshAdviceEl.addEventListener("click", async () => {
+  try {
+    await fetchAdvice();
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "Advies ophalen mislukt");
+  }
+});
 savePresetEl.addEventListener("click", saveCurrentPreset);
 deletePresetEl.addEventListener("click", deleteSelectedPreset);
 presetSelectEl.addEventListener("change", applySelectedPreset);

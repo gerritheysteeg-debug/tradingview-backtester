@@ -166,10 +166,18 @@
             <p id="strategy-label" class="eyebrow">Support / Resistance v1</p>
             <h2 id="active-title">BTC-PERPETUAL · 15m entries · 4h levels</h2>
           </div>
-          <div id="status" class="status">Klaar</div>
+          <div class="topbar-actions">
+            <button id="refresh-advice" class="advice-button" type="button">Advies</button>
+            <div id="status" class="status">Klaar</div>
+          </div>
         </header>
 
         <section class="metrics" id="metrics"></section>
+
+        <section id="advice-section" class="advice-section hidden">
+          <div id="advice-cards" class="advice-cards"></div>
+          <div class="advice-updated"><span id="advice-time"></span></div>
+        </section>
 
         <section class="chart-section">
           <div id="chart" class="chart"></div>

@@ -491,3 +491,92 @@ function round(value, decimals = 2) {
   const multiplier = 10 ** decimals;
   return Math.round(value * multiplier) / multiplier;
 }
+
+// ─── Live Signal Scanner ──────────────────────────────────────────────────────
+
+export function scanSupportResistance({ entryCandles, levelCandles, options = {} }) {
+  const config = normalizeOptions(options);
+  // Use minTouches:1 for scan — we want candidate levels, not just proven ones
+  const levels = detectLevels(levelCandles, { ...config, minTouches: 1 });
+  if (!entryCandles.length || !levels.length) return { setups: [], currentPrice: 0 };
+
+  const currentPrice = entryCandles[entryCandles.length - 1].close;
+  const lastIndex = entryCandles.length - 1;
+  const tol = currentPrice * (config.levelTolerancePct / 100);
+
+  // For the scan we care about proximity, not full historical invalidation.
+  // Only check the last 30 entry candles for recent breaks.
+  const recentCandles = entryCandles.slice(-30);
+  const recentlyBrokenDown = new Set();
+  const recentlyBrokenUp = new Set();
+  for (const candle of recentCandles) {
+    for (const level of levels) {
+      const t = level.price * (config.levelTolerancePct / 100);
+      if (candle.close < level.price - t) recentlyBrokenDown.add(level.id);
+      if (candle.close > level.price + t) recentlyBrokenUp.add(level.id);
+    }
+  }
+
+  // Supports: below current price, not recently broken downward
+  const supports = levels
+    .filter(l => !recentlyBrokenDown.has(l.id) && l.price < currentPrice - tol)
+    .sort((a, b) => b.price - a.price);
+  // Resistances: above current price, not recently broken upward
+  const resistances = levels
+    .filter(l => !recentlyBrokenUp.has(l.id) && l.price > currentPrice + tol)
+    .sort((a, b) => a.price - b.price);
+
+  const setups = [];
+
+  if (supports.length && config.direction !== "short") {
+    const level = supports[0];
+    const stopResult = resolveStop({ candles: entryCandles, index: lastIndex, levels, level, direction: "long", config });
+    if (stopResult) {
+      const stop = stopResult.price;
+      const risk = level.price - stop;
+      const tp3 = resistances[0]?.price ?? level.price + risk * 3;
+      const dist = round((currentPrice - level.price) / currentPrice * 100, 2);
+      const proximity = (currentPrice - level.price) / tol;
+      setups.push({
+        direction: "long",
+        status: proximity <= 4 ? "watch" : "pending",
+        entryPrice: round(level.price, 1),
+        stopPrice: round(stop, 1),
+        tp1: round(level.price + risk, 1),
+        tp2: round(level.price + risk * 2, 1),
+        tp3: round(tp3, 1),
+        score: Math.min(100, Math.round(level.strength * 8)),
+        rr: round(risk > 0 ? (tp3 - level.price) / risk : 0, 2),
+        description: `${level.type} · ${level.touches} touches`,
+        distance: `${dist}% onder prijs`
+      });
+    }
+  }
+
+  if (resistances.length && config.direction !== "long") {
+    const level = resistances[0];
+    const stopResult = resolveStop({ candles: entryCandles, index: lastIndex, levels, level, direction: "short", config });
+    if (stopResult) {
+      const stop = stopResult.price;
+      const risk = stop - level.price;
+      const tp3 = supports[0]?.price ?? level.price - risk * 3;
+      const dist = round((level.price - currentPrice) / currentPrice * 100, 2);
+      const proximity = (level.price - currentPrice) / tol;
+      setups.push({
+        direction: "short",
+        status: proximity <= 4 ? "watch" : "pending",
+        entryPrice: round(level.price, 1),
+        stopPrice: round(stop, 1),
+        tp1: round(level.price - risk, 1),
+        tp2: round(level.price - risk * 2, 1),
+        tp3: round(tp3, 1),
+        score: Math.min(100, Math.round(level.strength * 8)),
+        rr: round(risk > 0 ? (level.price - tp3) / risk : 0, 2),
+        description: `${level.type} · ${level.touches} touches`,
+        distance: `${dist}% boven prijs`
+      });
+    }
+  }
+
+  return { setups, currentPrice };
+}

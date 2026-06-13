@@ -646,6 +646,90 @@ function round(value, decimals = 2) {
   return Math.round(value * m) / m;
 }
 
+// ─── Live Signal Scanner ──────────────────────────────────────────────────────
+
+export function scanLiquidityDrivenSMC({ entryCandles, levelCandles, candlesByResolution = {}, options = {} }) {
+  const config = normalizeOptions(options);
+  const m3 = candlesByResolution["3m"] ?? entryCandles;
+  const m15 = candlesByResolution["15m"] ?? [];
+  const h4 = candlesByResolution["4h"] ?? levelCandles;
+  const d1 = candlesByResolution["1D"] ?? [];
+  const w1 = candlesByResolution["1W"] ?? [];
+
+  if (!m3.length) return { setups: [], currentPrice: 0 };
+
+  const currentPrice = m3[m3.length - 1].close;
+  const pools = buildAllLiquidityPools({ h4, m15, daily: d1, weekly: w1 }, config);
+  const d1Bias = d1.length >= 8 ? detectBias(d1, d1.length - 1, 14) : "neutral";
+
+  const sellSideBelow = pools
+    .filter(p => !p.swept && p.direction === "sell_side" && p.level < currentPrice * 0.9995)
+    .sort((a, b) => b.level - a.level);
+
+  const buySideAbove = pools
+    .filter(p => !p.swept && p.direction === "buy_side" && p.level > currentPrice * 1.0005)
+    .sort((a, b) => a.level - b.level);
+
+  const setups = [];
+
+  if (sellSideBelow.length && config.direction !== "short") {
+    const pool = sellSideBelow[0];
+    const stop = round(pool.level * (1 - config.stopBufferPct / 100), 1);
+    const risk = currentPrice - stop;
+    const tp3 = buySideAbove[0]?.level ?? currentPrice + risk * 3;
+    const dist = round((currentPrice - pool.level) / currentPrice * 100, 2);
+    const biasBonus = d1Bias === "long" ? 20 : d1Bias === "neutral" ? 10 : 0;
+
+    setups.push({
+      direction: "long",
+      status: "watch",
+      entryPrice: round(currentPrice, 1),
+      stopPrice: stop,
+      tp1: round(currentPrice + risk, 1),
+      tp2: round(currentPrice + risk * 2, 1),
+      tp3: round(tp3, 1),
+      score: Math.min(100, 40 + Math.round(pool.strength * 4) + biasBonus),
+      rr: round(risk > 0 ? (tp3 - currentPrice) / risk : 0, 2),
+      description: `${smcPoolFmt(pool.type)} @ ${round(pool.level, 1)} · wacht op sweep & reclaim · D1: ${smcBiasFmt(d1Bias)}`,
+      distance: `Liquiditeitspool ${dist}% onder prijs`
+    });
+  }
+
+  if (buySideAbove.length && config.direction !== "long") {
+    const pool = buySideAbove[0];
+    const stop = round(pool.level * (1 + config.stopBufferPct / 100), 1);
+    const risk = stop - currentPrice;
+    const tp3 = sellSideBelow[0]?.level ?? currentPrice - risk * 3;
+    const dist = round((pool.level - currentPrice) / currentPrice * 100, 2);
+    const biasBonus = d1Bias === "short" ? 20 : d1Bias === "neutral" ? 10 : 0;
+
+    setups.push({
+      direction: "short",
+      status: "watch",
+      entryPrice: round(currentPrice, 1),
+      stopPrice: stop,
+      tp1: round(currentPrice - risk, 1),
+      tp2: round(currentPrice - risk * 2, 1),
+      tp3: round(tp3, 1),
+      score: Math.min(100, 40 + Math.round(pool.strength * 4) + biasBonus),
+      rr: round(risk > 0 ? (currentPrice - tp3) / risk : 0, 2),
+      description: `${smcPoolFmt(pool.type)} @ ${round(pool.level, 1)} · wacht op sweep & reclaim · D1: ${smcBiasFmt(d1Bias)}`,
+      distance: `Liquiditeitspool ${dist}% boven prijs`
+    });
+  }
+
+  return { setups, currentPrice };
+}
+
+function smcBiasFmt(bias) {
+  return bias === "long" ? "bullish" : bias === "short" ? "bearish" : "neutraal";
+}
+
+function smcPoolFmt(type) {
+  const map = { equal_highs: "Equal Highs", equal_lows: "Equal Lows", prev_day_high: "Prev Day High", prev_day_low: "Prev Day Low", prev_week_high: "Prev Week High", prev_week_low: "Prev Week Low", range_high: "Range High", range_low: "Range Low" };
+  return map[type] ?? type;
+}
+
 function normalizeOptions(options) {
   const merged = { ...DEFAULT_OPTIONS, ...options, stopMode: "sweep" };
   const total = merged.partials.reduce((s, p) => s + Number(p.size), 0);

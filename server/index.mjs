@@ -11,7 +11,8 @@ import {
 import {
   getStrategy,
   listStrategies,
-  runStrategyBacktest
+  runStrategyBacktest,
+  scanStrategy
 } from "../public/shared/strategyRegistry.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
@@ -147,6 +148,37 @@ async function handleApi(request, response) {
       levelCandles,
       ...result
     });
+    return;
+  }
+
+  if (url.pathname === "/api/next-entry" && request.method === "GET") {
+    const instrumentName = url.searchParams.get("instrument") ?? "BTC-PERPETUAL";
+    const strategyId = url.searchParams.get("strategy") ?? "support-resistance-v1";
+    const lookbackDays = Number(url.searchParams.get("lookbackDays") ?? 90);
+    let options = {};
+    try { options = JSON.parse(url.searchParams.get("options") ?? "{}"); } catch {}
+
+    const strategy = getStrategy(strategyId);
+    const entryResolution = strategy.chartResolution ?? url.searchParams.get("entryResolution") ?? "15m";
+    const levelResolution = strategy.levelResolution ?? url.searchParams.get("levelResolution") ?? "4h";
+    const endTimestamp = nowMs();
+    const startTimestamp = endTimestamp - lookbackDays * 24 * 60 * 60 * 1000;
+    const requiredResolutions = strategy.requiredResolutions?.length
+      ? strategy.requiredResolutions
+      : [...new Set([entryResolution, levelResolution])];
+    const candlesByResolution = Object.fromEntries(
+      await Promise.all(
+        requiredResolutions.map(async (resolution) => [
+          resolution,
+          await getCandles({ instrumentName, resolution, startTimestamp, endTimestamp })
+        ])
+      )
+    );
+    const entryCandles = candlesByResolution[entryResolution] ?? [];
+    const levelCandles = candlesByResolution[levelResolution] ?? [];
+
+    const result = scanStrategy({ strategyId, entryCandles, levelCandles, candlesByResolution, options });
+    sendJson(response, 200, { instrumentName, strategyId, updatedAt: Date.now(), ...result });
     return;
   }
 
