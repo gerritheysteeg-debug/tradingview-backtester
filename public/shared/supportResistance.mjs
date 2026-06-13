@@ -8,6 +8,7 @@ const DEFAULT_OPTIONS = {
   stopMode: "swing",
   swingStopLookback: 12,
   maxHoldBars: 180,
+  maxLevelAgeDays: 0,
   direction: "both",
   partials: [
     { r: 1, size: 0.35 },
@@ -70,8 +71,15 @@ export function detectLevels(candles, options = {}) {
     });
   }
 
-  return levels
-    .filter((level) => level.touches >= config.minTouches)
+  let filtered = levels.filter((level) => level.touches >= config.minTouches);
+
+  if (config.maxLevelAgeDays > 0 && candles.length > 0) {
+    const lastTime = candles[candles.length - 1].time;
+    const cutoff = lastTime - config.maxLevelAgeDays * 86400;
+    filtered = filtered.filter((level) => level.lastTouchTime >= cutoff);
+  }
+
+  return filtered
     .map((level) => ({
       ...level,
       type: level.types.size > 1 ? "both" : [...level.types][0],
@@ -118,17 +126,33 @@ export function detectPivots(candles, swingWindow = 3) {
 function simulateTrades(candles, levels, config) {
   const trades = [];
   let openUntilIndex = -1;
+  const invalidated = new Set();
 
   for (let i = Math.max(config.volumeLookback, config.swingStopLookback); i < candles.length - 2; i += 1) {
     if (i <= openUntilIndex) continue;
 
     const candle = candles[i];
+
+    for (const level of levels) {
+      if (invalidated.has(level.id)) continue;
+      const tol = level.price * (config.levelTolerancePct / 100);
+      const supportBroken =
+        (level.type === "support" || level.type === "both") &&
+        candle.close < level.price - tol;
+      const resistanceBroken =
+        (level.type === "resistance" || level.type === "both") &&
+        candle.close > level.price + tol;
+      if (supportBroken || resistanceBroken) {
+        invalidated.add(level.id);
+      }
+    }
+
     const volumeAverage = averageVolume(candles, i, config.volumeLookback);
     if (volumeAverage === 0 || candle.volume < volumeAverage * config.volumeMultiplier) {
       continue;
     }
 
-    const setup = findSetup(candles, i, levels, config);
+    const setup = findSetup(candles, i, levels, config, invalidated);
     if (!setup) continue;
 
     const trade = playTrade(candles, i, setup, config);
@@ -141,14 +165,19 @@ function simulateTrades(candles, levels, config) {
     });
   }
 
+  for (const level of levels) {
+    level.active = !invalidated.has(level.id);
+  }
+
   return trades;
 }
 
-function findSetup(candles, index, levels, config) {
+function findSetup(candles, index, levels, config, invalidated = new Set()) {
   const candle = candles[index];
   const previous = candles[index - 1];
 
   for (const level of levels) {
+    if (invalidated.has(level.id)) continue;
     if (level.lastTouchTime >= candle.time) continue;
 
     const tolerance = level.price * (config.levelTolerancePct / 100);

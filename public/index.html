@@ -118,6 +118,20 @@
             </select>
           </label>
 
+          <div id="sr-options">
+            <label>
+              Max. level leeftijd (dagen)
+              <input id="max-level-age" name="maxLevelAgeDays" type="number" min="0" max="720" step="1" value="0" title="0 = geen limiet">
+            </label>
+          </div>
+
+          <div id="doopiecash-options" class="hidden">
+            <label>
+              Min. score om te traden
+              <input id="min-score" name="minimumScoreToTrade" type="number" min="0" max="100" step="5" value="70">
+            </label>
+          </div>
+
           <button class="primary-button" type="submit">
             Run backtest
           </button>
@@ -162,14 +176,14 @@
               <table>
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Side</th>
-                    <th>Entry</th>
-                    <th>Stop</th>
-                    <th>Stop type</th>
-                    <th>Exit</th>
-                    <th>Score</th>
-                    <th>R</th>
+                    <th data-sort="num">ID</th>
+                    <th data-sort="direction">Side</th>
+                    <th data-sort="entry">Entry</th>
+                    <th data-sort="stop">Stop</th>
+                    <th data-sort="stopMode">Stop type</th>
+                    <th data-sort="exitPrice">Exit</th>
+                    <th data-sort="score">Score</th>
+                    <th data-sort="rMultiple">R</th>
                   </tr>
                 </thead>
                 <tbody id="trades-body"></tbody>
@@ -180,6 +194,7 @@
       </section>
     </main>
 
+    <div id="toast" class="toast" hidden></div>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

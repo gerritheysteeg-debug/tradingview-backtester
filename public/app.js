@@ -17,12 +17,18 @@ const presetSelectEl = document.querySelector("#preset-select");
 const presetNameEl = document.querySelector("#preset-name");
 const savePresetEl = document.querySelector("#save-preset");
 const deletePresetEl = document.querySelector("#delete-preset");
+const srOptionsEl = document.querySelector("#sr-options");
+const doopieOptionsEl = document.querySelector("#doopiecash-options");
+const toastEl = document.querySelector("#toast");
 
 const PRESET_STORAGE_KEY = "tradingResearch.presets.v1";
 
 let chart;
 let candleSeries;
 let liveTimer;
+let toastTimer;
+let lastTrades = [];
+let sortState = { col: null, asc: true };
 
 const metricDefs = [
   ["trades", "Trades"],
@@ -38,6 +44,21 @@ function setStatus(message) {
   statusEl.textContent = message;
 }
 
+function showToast(message) {
+  clearTimeout(toastTimer);
+  toastEl.textContent = message;
+  toastEl.hidden = false;
+  toastTimer = setTimeout(() => {
+    toastEl.hidden = true;
+  }, 5000);
+}
+
+function updateStrategyOptions() {
+  const isDoopie = strategyEl.value === "doopiecash-naked-price-action-v1";
+  srOptionsEl.classList.toggle("hidden", isDoopie);
+  doopieOptionsEl.classList.toggle("hidden", !isDoopie);
+}
+
 function formPayload() {
   const data = new FormData(form);
   return {
@@ -50,7 +71,9 @@ function formPayload() {
       volumeMultiplier: Number(data.get("volumeMultiplier")),
       levelTolerancePct: Number(data.get("levelTolerancePct")),
       direction: data.get("direction"),
-      stopMode: data.get("stopMode")
+      stopMode: data.get("stopMode"),
+      maxLevelAgeDays: Number(data.get("maxLevelAgeDays") ?? 0),
+      minimumScoreToTrade: Number(data.get("minimumScoreToTrade") ?? 70)
     }
   };
 }
@@ -68,7 +91,9 @@ function currentPresetValues() {
     volumeMultiplier: Number(data.get("volumeMultiplier")),
     levelTolerancePct: Number(data.get("levelTolerancePct")),
     direction: data.get("direction"),
-    stopMode: data.get("stopMode")
+    stopMode: data.get("stopMode"),
+    maxLevelAgeDays: Number(data.get("maxLevelAgeDays") ?? 0),
+    minimumScoreToTrade: Number(data.get("minimumScoreToTrade") ?? 70)
   };
 }
 
@@ -121,9 +146,10 @@ async function loadStrategies() {
       )
       .join("");
     setSelectValue(strategyEl, "support-resistance-v1");
+    updateStrategyOptions();
   } catch (error) {
     console.error(error);
-    setStatus("Strategieën konden niet worden geladen");
+    showToast("Strategieën konden niet worden geladen");
   }
 }
 
@@ -175,7 +201,8 @@ async function runBacktest() {
     setStatus(`Bijgewerkt ${new Date().toLocaleTimeString("nl-NL")}`);
   } catch (error) {
     console.error(error);
-    setStatus(error instanceof Error ? error.message : "Fout");
+    setStatus("Fout");
+    showToast(error instanceof Error ? error.message : "Backtest mislukt");
   } finally {
     button.disabled = false;
   }
@@ -304,25 +331,38 @@ function renderMetrics(metrics) {
 function renderLevels(levels) {
   levelCountEl.textContent = String(levels.length);
   levelsListEl.innerHTML = levels
-    .map(
-      (level) => `
-        <div class="level-row">
+    .map((level) => {
+      const broken = level.active === false;
+      return `
+        <div class="level-row${broken ? " invalidated" : ""}">
           <div>
             <strong>${formatPrice(level.price)}</strong>
-            <small>${level.type} · ${level.touches} touches</small>
+            <small>${level.type} · ${level.touches} touches${broken ? " · gebroken" : ""}</small>
           </div>
           <small>${level.strength.toFixed(1)}</small>
         </div>
-      `
-    )
+      `;
+    })
     .join("");
 }
 
+function sortTrades(trades) {
+  const { col, asc } = sortState;
+  if (!col) return trades.slice().reverse();
+  return trades.slice().sort((a, b) => {
+    let av = col === "num" ? parseInt(a.id.slice(1)) || 0 : a[col];
+    let bv = col === "num" ? parseInt(b.id.slice(1)) || 0 : b[col];
+    if (typeof av === "string") return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+    av = av ?? 0;
+    bv = bv ?? 0;
+    return asc ? av - bv : bv - av;
+  });
+}
+
 function renderTrades(trades) {
+  lastTrades = trades;
   tradeCountEl.textContent = String(trades.length);
-  tradesBodyEl.innerHTML = trades
-    .slice()
-    .reverse()
+  tradesBodyEl.innerHTML = sortTrades(trades)
     .map(
       (trade) => `
         <tr>
@@ -433,6 +473,9 @@ async function applyPresetValues(values) {
   form.elements.lookbackDays.value = values.lookbackDays ?? 90;
   form.elements.volumeMultiplier.value = values.volumeMultiplier ?? 1.15;
   form.elements.levelTolerancePct.value = values.levelTolerancePct ?? 0.35;
+  form.elements.maxLevelAgeDays.value = values.maxLevelAgeDays ?? 0;
+  form.elements.minimumScoreToTrade.value = values.minimumScoreToTrade ?? 70;
+  updateStrategyOptions();
   await loadInstruments({ preferredInstrument: values.instrument ?? "BTC-PERPETUAL" });
 }
 
@@ -500,9 +543,28 @@ kindEl.addEventListener("change", () => {
   loadInstruments({ preferredInstrument: "" });
 });
 
+strategyEl.addEventListener("change", updateStrategyOptions);
+
 savePresetEl.addEventListener("click", saveCurrentPreset);
 deletePresetEl.addEventListener("click", deleteSelectedPreset);
 presetSelectEl.addEventListener("change", applySelectedPreset);
 liveRefreshEl.addEventListener("change", configureLiveRefresh);
+
+document.querySelectorAll("th[data-sort]").forEach((th) => {
+  th.addEventListener("click", () => {
+    const col = th.dataset.sort;
+    if (sortState.col === col) {
+      sortState.asc = !sortState.asc;
+    } else {
+      sortState.col = col;
+      sortState.asc = true;
+    }
+    document.querySelectorAll("th[data-sort]").forEach((el) => {
+      el.classList.remove("sort-asc", "sort-desc");
+    });
+    th.classList.add(sortState.asc ? "sort-asc" : "sort-desc");
+    renderTrades(lastTrades);
+  });
+});
 
 initialize();
