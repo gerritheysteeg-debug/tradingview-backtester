@@ -392,6 +392,66 @@ select:focus {
   text-align: right;
 }
 
+.correlation-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.correlation-body {
+  padding: 10px 14px 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.streak-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.streak-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.streak-dot.win  { background: var(--accent-2); }
+.streak-dot.loss { background: var(--danger); }
+
+.streak-dot.streak-start {
+  box-shadow: -2px 0 0 0 var(--warning);
+}
+
+.correlation-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.corr-stat {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  padding: 10px 12px;
+}
+
+.corr-stat small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.corr-stat strong {
+  font-size: 18px;
+}
+
+.corr-stat strong.danger { color: var(--danger); }
+.corr-stat strong.positive { color: var(--accent-2); }
+.corr-stat strong.warning { color: var(--warning); }
+
 .lower-grid {
   display: grid;
   grid-template-columns: 0.8fr 1.2fr;

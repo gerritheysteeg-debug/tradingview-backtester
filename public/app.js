@@ -25,6 +25,8 @@ const toastEl = document.querySelector("#toast");
 const equityChartEl = document.querySelector("#equity-chart");
 const monteCarloEl = document.querySelector("#monte-carlo");
 const mcStatsEl = document.querySelector("#mc-stats");
+const streakStripEl = document.querySelector("#streak-strip");
+const correlationStatsEl = document.querySelector("#correlation-stats");
 const exportCsvEl = document.querySelector("#export-csv");
 const monthlyBodyEl = document.querySelector("#monthly-body");
 const adviceSectionEl = document.querySelector("#advice-section");
@@ -309,6 +311,7 @@ function renderResult(result) {
   clearMonteCarlo();
   renderEquityCurve(result.trades);
   renderMonthlyBreakdown(result.trades);
+  renderCorrelation(result.trades);
   chart.timeScale().fitContent();
 }
 
@@ -502,6 +505,80 @@ function renderMonthlyBreakdown(trades) {
       </tr>`;
     })
     .join("");
+}
+
+function renderCorrelation(trades) {
+  if (!streakStripEl || !correlationStatsEl) return;
+  if (!trades.length) {
+    streakStripEl.innerHTML = "";
+    correlationStatsEl.innerHTML = "";
+    return;
+  }
+
+  const sorted = trades.slice().sort((a, b) => a.exitTime - b.exitTime);
+  const seq = sorted.map(t => t.rMultiple > 0);
+
+  // Streak analysis
+  let maxWin = 0, maxLoss = 0, curWin = 0, curLoss = 0;
+  const lossStreaks = []; // lengths of each losing streak
+  let inLossStreak = false, curLossLen = 0;
+
+  for (const win of seq) {
+    if (win) {
+      curWin++; curLoss = 0;
+      if (inLossStreak) { lossStreaks.push(curLossLen); curLossLen = 0; inLossStreak = false; }
+      maxWin = Math.max(maxWin, curWin);
+    } else {
+      curLoss++; curWin = 0;
+      inLossStreak = true; curLossLen++;
+      maxLoss = Math.max(maxLoss, curLoss);
+    }
+  }
+  if (inLossStreak) lossStreaks.push(curLossLen);
+
+  const totalLosses = seq.filter(w => !w).length;
+  const clusteredLosses = lossStreaks.filter(l => l >= 2).reduce((s, l) => s + l, 0);
+  const clusterPct = totalLosses > 0 ? Math.round(clusteredLosses / totalLosses * 100) : 0;
+  const avgLossStreak = lossStreaks.length
+    ? (lossStreaks.reduce((s, l) => s + l, 0) / lossStreaks.length).toFixed(1)
+    : "0";
+
+  // Streak strip — mark first dot of each losing streak
+  const streakStarts = new Set();
+  let prev = true;
+  for (let i = 0; i < seq.length; i++) {
+    if (!seq[i] && prev) streakStarts.add(i);
+    prev = seq[i];
+  }
+
+  streakStripEl.innerHTML = seq.map((win, i) => {
+    const cls = win ? "win" : "loss";
+    const start = !win && streakStarts.has(i) ? " streak-start" : "";
+    const trade = sorted[i];
+    const tip = `${trade.direction ?? ""} ${win ? "+" : ""}${trade.rMultiple?.toFixed(2)}R`;
+    return `<div class="streak-dot ${cls}${start}" title="${tip}"></div>`;
+  }).join("");
+
+  const clusterColor = clusterPct >= 60 ? "danger" : clusterPct >= 40 ? "warning" : "positive";
+
+  correlationStatsEl.innerHTML = `
+    <div class="corr-stat">
+      <small>Max verliesreeks</small>
+      <strong class="danger">${maxLoss}×</strong>
+    </div>
+    <div class="corr-stat">
+      <small>Max winreeks</small>
+      <strong class="positive">${maxWin}×</strong>
+    </div>
+    <div class="corr-stat">
+      <small>Verlies clustering</small>
+      <strong class="${clusterColor}">${clusterPct}%</strong>
+    </div>
+    <div class="corr-stat">
+      <small>Gem. verliesreeks</small>
+      <strong>${avgLossStreak}×</strong>
+    </div>
+  `;
 }
 
 function exportCsv() {
