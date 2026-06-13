@@ -190,6 +190,21 @@
         </section>
 
         <section class="chart-section">
+          <div class="chart-legend">
+            <div class="legend-group" id="legend-price">
+              <span class="legend-item"><span class="legend-line level-line"></span>S/R niveau</span>
+              <span class="legend-item"><span class="legend-line entry-long-line"></span>Entry long</span>
+              <span class="legend-item"><span class="legend-line entry-short-line"></span>Entry short</span>
+              <span class="legend-item"><span class="legend-line stop-line"></span>Stop</span>
+              <span class="legend-item"><span class="legend-line tp-line"></span>Take profit</span>
+            </div>
+            <div class="legend-group hidden" id="legend-mc">
+              <span class="legend-item"><span class="legend-line eq-line"></span>Equity curve</span>
+              <span class="legend-item"><span class="legend-line mc-p95-line"></span>MC P95 (beste 5%)</span>
+              <span class="legend-item"><span class="legend-line mc-p50-line"></span>MC mediaan</span>
+              <span class="legend-item"><span class="legend-line mc-p5-line"></span>MC P5 (slechtste 5%)</span>
+            </div>
+          </div>
           <div id="chart" class="chart"></div>
           <div id="equity-chart" class="equity-chart"></div>
           <div id="mc-stats" class="mc-stats hidden"></div>

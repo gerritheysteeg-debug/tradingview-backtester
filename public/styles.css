@@ -378,6 +378,56 @@ select:focus {
   min-height: 360px;
 }
 
+.chart-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-bottom: 8px;
+}
+
+.legend-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 22px;
+  height: 2px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+.legend-line.level-line {
+  background: repeating-linear-gradient(90deg, #f2b84b 0, #f2b84b 4px, transparent 4px, transparent 7px);
+}
+.legend-line.entry-long-line  { background: #4cc9b0; height: 2px; }
+.legend-line.entry-short-line { background: #ff6b6b; height: 2px; }
+.legend-line.stop-line {
+  background: repeating-linear-gradient(90deg, #ff6b6b 0, #ff6b6b 4px, transparent 4px, transparent 7px);
+}
+.legend-line.tp-line { background: #d6ff62; }
+.legend-line.eq-line { background: #f2b84b; height: 3px; }
+.legend-line.mc-p95-line {
+  background: repeating-linear-gradient(90deg, #4cc9b0 0, #4cc9b0 4px, transparent 4px, transparent 7px);
+}
+.legend-line.mc-p50-line {
+  background: repeating-linear-gradient(90deg, #93a1a8 0, #93a1a8 4px, transparent 4px, transparent 7px);
+}
+.legend-line.mc-p5-line {
+  background: repeating-linear-gradient(90deg, #ff6b6b 0, #ff6b6b 4px, transparent 4px, transparent 7px);
+}
+
 .equity-chart {
   width: 100%;
   height: 120px;

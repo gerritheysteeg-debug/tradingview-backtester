@@ -25,6 +25,7 @@ const toastEl = document.querySelector("#toast");
 const equityChartEl = document.querySelector("#equity-chart");
 const monteCarloEl = document.querySelector("#monte-carlo");
 const mcStatsEl = document.querySelector("#mc-stats");
+const legendMcEl = document.querySelector("#legend-mc");
 const streakStripEl = document.querySelector("#streak-strip");
 const correlationStatsEl = document.querySelector("#correlation-stats");
 const exportCsvEl = document.querySelector("#export-csv");
@@ -389,6 +390,7 @@ function clearMonteCarlo() {
   }
   mcSeries = [];
   if (mcStatsEl) mcStatsEl.classList.add("hidden");
+  if (legendMcEl) legendMcEl.classList.add("hidden");
 }
 
 function computeMonteCarlo(trades, iterations = 1000) {
@@ -465,6 +467,7 @@ function renderMonteCarlo(trades) {
   mcStatsEl.textContent =
     `Monte Carlo 1000× · P5 max drawdown: -${result.worstDd.toFixed(2)}R · P95 eindstand: +${result.p95End.toFixed(2)}R`;
   mcStatsEl.classList.remove("hidden");
+  if (legendMcEl) legendMcEl.classList.remove("hidden");
 }
 
 function renderMonthlyBreakdown(trades) {
