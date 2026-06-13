@@ -173,6 +173,7 @@
 
         <section class="chart-section">
           <div id="chart" class="chart"></div>
+          <div id="equity-chart" class="equity-chart"></div>
         </section>
 
         <section class="lower-grid">
@@ -187,7 +188,10 @@
           <div class="panel">
             <div class="panel-header">
               <h3>Trades</h3>
-              <span id="trade-count">0</span>
+              <div class="panel-header-actions">
+                <span id="trade-count">0</span>
+                <button id="export-csv" class="icon-button" type="button" title="Exporteer als CSV">↓ CSV</button>
+              </div>
             </div>
             <div class="table-wrap">
               <table>
@@ -208,6 +212,28 @@
             </div>
           </div>
         </section>
+        <div class="panel monthly-panel">
+          <div class="panel-header">
+            <h3>Maandelijks</h3>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Maand</th>
+                  <th>Trades</th>
+                  <th>Wins</th>
+                  <th>Win%</th>
+                  <th>Totaal R</th>
+                  <th>Avg R</th>
+                  <th>Best</th>
+                  <th>Worst</th>
+                </tr>
+              </thead>
+              <tbody id="monthly-body"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
     </main>
 

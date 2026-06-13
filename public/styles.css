@@ -173,7 +173,7 @@ select:focus {
 
 .workspace {
   display: grid;
-  grid-template-rows: auto auto minmax(360px, 1fr) auto;
+  grid-template-rows: auto auto minmax(420px, 1fr) auto auto;
   gap: 18px;
   padding: 22px;
   min-width: 0;
@@ -234,14 +234,24 @@ select:focus {
 }
 
 .chart-section {
-  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
   padding: 12px;
 }
 
 .chart {
   width: 100%;
-  height: 100%;
-  min-height: 396px;
+  flex: 1;
+  min-height: 360px;
+}
+
+.equity-chart {
+  width: 100%;
+  height: 120px;
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+  padding-top: 4px;
 }
 
 .lower-grid {
@@ -271,6 +281,23 @@ select:focus {
 .panel-header span {
   color: var(--muted);
   font-size: 13px;
+}
+
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-header-actions .icon-button {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.monthly-panel {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .list {

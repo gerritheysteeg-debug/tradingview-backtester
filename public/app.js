@@ -21,11 +21,16 @@ const srOptionsEl = document.querySelector("#sr-options");
 const doopieOptionsEl = document.querySelector("#doopiecash-options");
 const smcOptionsEl = document.querySelector("#smc-options");
 const toastEl = document.querySelector("#toast");
+const equityChartEl = document.querySelector("#equity-chart");
+const exportCsvEl = document.querySelector("#export-csv");
+const monthlyBodyEl = document.querySelector("#monthly-body");
 
 const PRESET_STORAGE_KEY = "tradingResearch.presets.v1";
 
 let chart;
 let candleSeries;
+let equityChart;
+let equitySeries;
 let liveTimer;
 let toastTimer;
 let lastTrades = [];
@@ -277,6 +282,8 @@ function renderResult(result) {
   renderMetrics(result.metrics);
   renderLevels(result.levels);
   renderTrades(result.trades);
+  renderEquityCurve(result.trades);
+  renderMonthlyBreakdown(result.trades);
   chart.timeScale().fitContent();
 }
 
@@ -302,6 +309,122 @@ function renderPriceLines(levels) {
       title: ""
     })
   );
+}
+
+function ensureEquityChart() {
+  if (equityChart) return;
+  equityChart = LightweightCharts.createChart(equityChartEl, {
+    autoSize: true,
+    layout: { background: { color: "#1a1f22" }, textColor: "#93a1a8" },
+    grid: { vertLines: { color: "#263036" }, horzLines: { color: "#263036" } },
+    rightPriceScale: { borderColor: "#323b40" },
+    timeScale: { borderColor: "#323b40", timeVisible: false, secondsVisible: false },
+    handleScroll: false,
+    handleScale: false,
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
+  });
+  equitySeries = equityChart.addAreaSeries({
+    lineColor: "#f2b84b",
+    topColor: "rgba(242,184,75,0.22)",
+    bottomColor: "rgba(0,0,0,0)",
+    lineWidth: 1.5,
+    priceFormat: {
+      type: "custom",
+      formatter: (v) => (v >= 0 ? "+" : "") + v.toFixed(2) + "R"
+    }
+  });
+  chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+    if (range) equityChart.timeScale().setVisibleLogicalRange(range);
+  });
+}
+
+function renderEquityCurve(trades) {
+  ensureEquityChart();
+  if (!trades.length) { equitySeries.setData([]); return; }
+  const sorted = trades.slice().sort((a, b) => a.exitTime - b.exitTime);
+  let cumR = 0;
+  let lastTime = 0;
+  const data = [];
+  for (const t of sorted) {
+    cumR = parseFloat((cumR + t.rMultiple).toFixed(4));
+    const time = Math.max(t.exitTime, lastTime + 1);
+    data.push({ time, value: cumR });
+    lastTime = time;
+  }
+  equitySeries.setData(data);
+  equityChart.timeScale().fitContent();
+}
+
+function renderMonthlyBreakdown(trades) {
+  if (!monthlyBodyEl || !trades.length) {
+    if (monthlyBodyEl) monthlyBodyEl.innerHTML = "";
+    return;
+  }
+  const months = new Map();
+  for (const t of trades) {
+    const d = new Date(t.entryTime * 1000);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (!months.has(key)) months.set(key, []);
+    months.get(key).push(t);
+  }
+  const sorted = [...months.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  monthlyBodyEl.innerHTML = sorted
+    .map(([month, mTrades]) => {
+      const wins = mTrades.filter((t) => t.rMultiple > 0).length;
+      const totalR = mTrades.reduce((s, t) => s + t.rMultiple, 0);
+      const avgR = totalR / mTrades.length;
+      const best = Math.max(...mTrades.map((t) => t.rMultiple));
+      const worst = Math.min(...mTrades.map((t) => t.rMultiple));
+      const winPct = ((wins / mTrades.length) * 100).toFixed(0);
+      const [year, mon] = month.split("-");
+      const label = new Date(+year, +mon - 1).toLocaleDateString("nl-NL", {
+        month: "short",
+        year: "numeric"
+      });
+      return `<tr>
+        <td>${label}</td>
+        <td>${mTrades.length}</td>
+        <td>${wins}</td>
+        <td>${winPct}%</td>
+        <td class="${totalR >= 0 ? "positive" : "negative"}">${totalR.toFixed(2)}</td>
+        <td class="${avgR >= 0 ? "positive" : "negative"}">${avgR.toFixed(2)}</td>
+        <td class="positive">${best.toFixed(2)}</td>
+        <td class="negative">${worst.toFixed(2)}</td>
+      </tr>`;
+    })
+    .join("");
+}
+
+function exportCsv() {
+  if (!lastTrades.length) return;
+  const rows = [
+    ["ID", "Side", "Entry tijd", "Entry", "Stop", "Stop type", "Exit tijd", "Exit prijs", "Score", "R"],
+    ...lastTrades.map((t) => [
+      t.id,
+      t.direction,
+      formatTimestamp(t.entryTime),
+      t.entry,
+      t.stop,
+      formatStopMode(t.stopMode),
+      formatTimestamp(t.exitTime),
+      t.exitPrice,
+      t.score ?? "",
+      t.rMultiple
+    ])
+  ];
+  const csv = rows.map((r) => r.join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `trades_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function formatTimestamp(ts) {
+  if (!ts) return "";
+  return new Date(ts * 1000).toISOString().replace("T", " ").slice(0, 16);
 }
 
 function buildMarkers(trades) {
@@ -564,6 +687,7 @@ kindEl.addEventListener("change", () => {
 
 strategyEl.addEventListener("change", updateStrategyOptions);
 
+exportCsvEl.addEventListener("click", exportCsv);
 savePresetEl.addEventListener("click", saveCurrentPreset);
 deletePresetEl.addEventListener("click", deleteSelectedPreset);
 presetSelectEl.addEventListener("change", applySelectedPreset);
