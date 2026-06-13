@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Trading Research Backtester</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">TR</span>
+          <div>
+            <h1>Trading Research</h1>
+            <p>Backtest lab</p>
+          </div>
+        </div>
+
+        <form id="control-form" class="control-form">
+          <label>
+            Strategie
+            <select id="strategy" name="strategyId">
+              <option value="support-resistance-v1" selected>Support / Resistance v1</option>
+            </select>
+          </label>
+
+          <section class="control-group">
+            <label>
+              Preset
+              <select id="preset-select">
+                <option value="">Manual</option>
+              </select>
+            </label>
+            <div class="preset-actions">
+              <input id="preset-name" type="text" placeholder="Preset naam">
+              <button id="save-preset" class="secondary-button" type="button">Save</button>
+              <button id="delete-preset" class="icon-button" type="button" title="Preset verwijderen">X</button>
+            </div>
+          </section>
+
+          <div class="field-grid">
+            <label>
+              Currency
+              <select id="currency" name="currency">
+                <option value="BTC" selected>BTC</option>
+              </select>
+            </label>
+            <label>
+              Type
+              <select id="instrument-kind" name="kind">
+                <option value="future" selected>Futures</option>
+                <option value="option">Options</option>
+                <option value="spot">Spot</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            Instrument
+            <select id="instrument" name="instrument">
+              <option value="BTC-PERPETUAL" selected>BTC-PERPETUAL</option>
+            </select>
+          </label>
+
+          <div class="field-grid">
+            <label>
+              Entry
+              <select id="entry-resolution" name="entryResolution">
+                <option value="3m">3m</option>
+                <option value="5m">5m</option>
+                <option value="15m" selected>15m</option>
+                <option value="1h">1h</option>
+                <option value="4h">4h</option>
+              </select>
+            </label>
+            <label>
+              Levels
+              <select id="level-resolution" name="levelResolution">
+                <option value="1h">1h</option>
+                <option value="4h" selected>4h</option>
+                <option value="1D">1D</option>
+                <option value="1W">1W</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            Lookback dagen
+            <input id="lookback-days" name="lookbackDays" type="number" min="7" max="720" value="90">
+          </label>
+
+          <label>
+            Volume multiplier
+            <input id="volume-multiplier" name="volumeMultiplier" type="number" min="0.5" max="5" step="0.05" value="1.15">
+          </label>
+
+          <label>
+            Level tolerantie %
+            <input id="level-tolerance" name="levelTolerancePct" type="number" min="0.05" max="3" step="0.05" value="0.35">
+          </label>
+
+          <label>
+            Richting
+            <select id="direction" name="direction">
+              <option value="both" selected>Long + short</option>
+              <option value="long">Long only</option>
+              <option value="short">Short only</option>
+            </select>
+          </label>
+
+          <label>
+            Stop loss
+            <select id="stop-mode" name="stopMode">
+              <option value="swing" selected>Swing high/low</option>
+              <option value="level2">Level 2</option>
+            </select>
+          </label>
+
+          <button class="primary-button" type="submit">
+            Run backtest
+          </button>
+
+          <label class="check-row">
+            <input id="live-refresh" type="checkbox">
+            Live verversen
+          </label>
+        </form>
+      </aside>
+
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p id="strategy-label" class="eyebrow">Support / Resistance v1</p>
+            <h2 id="active-title">BTC-PERPETUAL · 15m entries · 4h levels</h2>
+          </div>
+          <div id="status" class="status">Klaar</div>
+        </header>
+
+        <section class="metrics" id="metrics"></section>
+
+        <section class="chart-section">
+          <div id="chart" class="chart"></div>
+        </section>
+
+        <section class="lower-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Levels</h3>
+              <span id="level-count">0</span>
+            </div>
+            <div id="levels-list" class="list"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <h3>Trades</h3>
+              <span id="trade-count">0</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Side</th>
+                    <th>Entry</th>
+                    <th>Stop</th>
+                    <th>Stop type</th>
+                    <th>Exit</th>
+                    <th>Score</th>
+                    <th>R</th>
+                  </tr>
+                </thead>
+                <tbody id="trades-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
