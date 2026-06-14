@@ -39,6 +39,15 @@ const adviceCardsDayEl   = document.querySelector("#advice-cards-day");
 const adviceCardsScalpEl = document.querySelector("#advice-cards-scalp");
 const adviceTimeEl = document.querySelector("#advice-time");
 const refreshAdviceEl = document.querySelector("#refresh-advice");
+const regimeCheckEl = document.querySelector("#regime-check");
+const regimeSectionEl = document.querySelector("#regime-section");
+const regimeBadgeEl = document.querySelector("#regime-badge");
+const regimeConfidenceEl = document.querySelector("#regime-confidence");
+const regimeBiasEl = document.querySelector("#regime-bias");
+const regimeRiskEl = document.querySelector("#regime-risk");
+const regimeRecEl = document.querySelector("#regime-rec");
+const regimeRouterBodyEl = document.querySelector("#regime-router-body");
+const regimeTimeEl = document.querySelector("#regime-time");
 
 const PRESET_STORAGE_KEY = "tradingResearch.presets.v1";
 
@@ -774,6 +783,81 @@ async function fetchAdvice() {
   setStatus(`Bijgewerkt ${new Date().toLocaleTimeString("nl-NL")}`);
 }
 
+const REGIME_COLORS = {
+  trend:       "#4cc9b0",
+  range:       "#f2b84b",
+  compression: "#93a1a8",
+  expansion:   "#d6ff62",
+  chop:        "#ff6b6b",
+  exhaustion:  "#ff9966",
+  unknown:     "#555"
+};
+
+const STATUS_LABELS = {
+  active:   "Actief",
+  allowed:  "Toegestaan",
+  watch:    "Let op",
+  blocked:  "Geblokkeerd",
+  no_trade: "Geen trade"
+};
+
+async function fetchRegimeDecision() {
+  const payload = formPayload();
+  setStatus("Regime analyse…");
+
+  const params = new URLSearchParams({
+    instrument:   payload.instrumentName,
+    lookbackDays: payload.lookbackDays,
+    options:      JSON.stringify(payload.options)
+  });
+
+  const result = await getJson(`/api/regime-decision?${params}`);
+  renderRegimeDecision(result);
+  setStatus(`Bijgewerkt ${new Date().toLocaleTimeString("nl-NL")}`);
+}
+
+function renderRegimeDecision(result) {
+  regimeSectionEl.classList.remove("hidden");
+
+  const color = REGIME_COLORS[result.regime] ?? "#555";
+  regimeBadgeEl.textContent = result.regimeLabel ?? result.regime;
+  regimeBadgeEl.style.color = color;
+  regimeBadgeEl.style.borderColor = color;
+
+  const reliabilityLabel = result.isReliable
+    ? "betrouwbaar"
+    : (result.confidence ?? 0) >= 55 ? "twijfelachtig" : "onbetrouwbaar";
+  regimeConfidenceEl.textContent = `${result.confidence ?? 0}% · ${reliabilityLabel}`;
+
+  regimeBiasEl.textContent = result.bias === "long" ? "↑ Bullish"
+    : result.bias === "short" ? "↓ Bearish"
+    : "→ Neutraal";
+
+  regimeRiskEl.textContent = `Risico ×${result.riskModifier ?? 1}`;
+
+  if (result.recommendedStrategyId) {
+    const rec = (result.strategyRouter ?? []).find(s => s.strategyId === result.recommendedStrategyId);
+    regimeRecEl.textContent = rec?.name ?? result.recommendedStrategyId;
+    regimeRecEl.className = "regime-rec-name positive";
+  } else {
+    regimeRecEl.textContent = result.regime === "chop"
+      ? "Geen trade aanbevolen"
+      : "Vertrouwen te laag voor aanbeveling";
+    regimeRecEl.className = "regime-rec-name negative";
+  }
+
+  regimeRouterBodyEl.innerHTML = (result.strategyRouter ?? []).map(s => `
+    <tr>
+      <td>${escapeHtml(s.name)}</td>
+      <td><span class="regime-status-badge status-${s.status}">${STATUS_LABELS[s.status] ?? s.status}</span></td>
+      <td class="regime-score">${s.score}</td>
+      <td class="regime-reason">${escapeHtml(s.reason)}</td>
+    </tr>
+  `).join("");
+
+  regimeTimeEl.textContent = `Bijgewerkt: ${new Date().toLocaleTimeString("nl-NL")}`;
+}
+
 function clearAdviceLines() {
   for (const line of adviceLines) {
     try { candleSeries.removePriceLine(line); } catch {}
@@ -1125,6 +1209,15 @@ refreshAdviceEl.addEventListener("click", async () => {
     await fetchAdvice();
   } catch (error) {
     showToast(error instanceof Error ? error.message : "Advies ophalen mislukt");
+  }
+});
+
+regimeCheckEl?.addEventListener("click", async () => {
+  try {
+    await fetchRegimeDecision();
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : "Regime analyse mislukt");
+    setStatus("Fout");
   }
 });
 savePresetEl.addEventListener("click", saveCurrentPreset);

@@ -27,7 +27,6 @@
               <option value="liquidity-driven-smc-v1">Liquidity Driven / SMC-lite v1</option>
               <option value="trend-pullback-v1">Trend Pullback v1</option>
               <option value="volatility-expansion-v1">Volatility Expansion v1</option>
-              <option value="market-regime-engine-v1">Market Regime Engine v1</option>
             </select>
           </label>
           <div id="strategy-doc-link" class="strategy-doc-link hidden">
@@ -190,6 +189,7 @@
           </div>
           <div class="topbar-actions">
             <button id="monte-carlo" class="icon-button" type="button">Monte Carlo</button>
+            <button id="regime-check" class="regime-button" type="button">Welke strategie nu?</button>
             <button id="refresh-advice" class="advice-button" type="button">Advies</button>
             <div id="status" class="status">Klaar</div>
           </div>
@@ -213,6 +213,38 @@
             </div>
           </div>
           <div class="advice-updated"><span id="advice-time"></span></div>
+        </section>
+
+        <section id="regime-section" class="regime-section hidden">
+          <div class="regime-header">
+            <div class="regime-header-left">
+              <span class="regime-label-prefix">Marktregime</span>
+              <span id="regime-badge" class="regime-badge">—</span>
+              <span id="regime-confidence" class="regime-confidence">—</span>
+            </div>
+            <div class="regime-header-right">
+              <span id="regime-bias" class="regime-pill">—</span>
+              <span id="regime-risk" class="regime-pill">—</span>
+              <div class="regime-rec-block">
+                <span class="regime-rec-label">Aanbeveling</span>
+                <span id="regime-rec" class="regime-rec-name">—</span>
+              </div>
+            </div>
+          </div>
+          <div class="regime-router-wrap">
+            <table class="regime-router-table">
+              <thead>
+                <tr>
+                  <th>Strategie</th>
+                  <th>Status</th>
+                  <th>Score</th>
+                  <th>Reden</th>
+                </tr>
+              </thead>
+              <tbody id="regime-router-body"></tbody>
+            </table>
+          </div>
+          <div class="regime-updated"><span id="regime-time"></span></div>
         </section>
 
         <section class="chart-section">

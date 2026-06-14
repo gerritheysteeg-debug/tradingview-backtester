@@ -14,6 +14,7 @@ import {
   runStrategyBacktest,
   scanStrategy
 } from "../public/shared/strategyRegistry.mjs";
+import { makeRegimeDecision } from "../public/shared/decisionEngine.mjs";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = normalize(join(__dirname, "..", "public"));
@@ -179,6 +180,32 @@ async function handleApi(request, response) {
 
     const result = scanStrategy({ strategyId, entryCandles, levelCandles, candlesByResolution, options });
     sendJson(response, 200, { instrumentName, strategyId, updatedAt: Date.now(), ...result });
+    return;
+  }
+
+  if (url.pathname === "/api/regime-decision" && request.method === "GET") {
+    const instrumentName = url.searchParams.get("instrument") ?? "BTC-PERPETUAL";
+    const lookbackDays   = Number(url.searchParams.get("lookbackDays") ?? 90);
+    let options = {};
+    try { options = JSON.parse(url.searchParams.get("options") ?? "{}"); } catch {}
+
+    const endTimestamp   = nowMs();
+    const startTimestamp = endTimestamp - lookbackDays * 24 * 60 * 60 * 1000;
+    const requiredResolutions = ["1W", "1D", "4h", "15m", "3m"];
+
+    const candlesByResolution = Object.fromEntries(
+      await Promise.all(
+        requiredResolutions.map(async (resolution) => [
+          resolution,
+          await getCandles({ instrumentName, resolution, startTimestamp, endTimestamp })
+        ])
+      )
+    );
+    const entryCandles = candlesByResolution["3m"] ?? [];
+    const levelCandles = candlesByResolution["4h"] ?? [];
+
+    const decision = makeRegimeDecision({ entryCandles, levelCandles, candlesByResolution, options });
+    sendJson(response, 200, { instrumentName, updatedAt: Date.now(), ...decision });
     return;
   }
 

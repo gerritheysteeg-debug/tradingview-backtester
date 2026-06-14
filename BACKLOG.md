@@ -35,6 +35,8 @@
 - [x] Executiekosten: feePct + slippagePct in simulator (gross vs net R).
 - [x] Testdekking: tradeSimulator (22 tests), supportResistance, trendPullback, volatilityExpansion, scan edge cases (45 tests totaal).
 
+- [x] Market Regime Decision Layer: decisionEngine.mjs, /api/regime-decision endpoint, "Welke strategie nu?" knop met routing-tabel per regime.
+
 ## Volgende sprint — betrouwbaarheid & realisme
 
 - [ ] Walk-forward / out-of-sample splits (in-sample vs out-of-sample venster instellen in UI).

@@ -206,7 +206,7 @@ select:focus {
 
 .workspace {
   display: grid;
-  grid-template-rows: auto auto auto minmax(420px, 1fr) auto auto;
+  grid-template-rows: auto auto auto auto minmax(420px, 1fr) auto auto;
   gap: 18px;
   padding: 22px;
   min-width: 0;
@@ -229,6 +229,22 @@ select:focus {
   min-height: 36px;
   padding: 0 14px;
   font-size: 13px;
+}
+
+.regime-button {
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  background: transparent;
+  color: var(--warning);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.regime-button:hover {
+  background: rgba(242, 184, 75, 0.1);
 }
 
 .advice-button {
@@ -778,6 +794,176 @@ th[data-sort].sort-desc::after {
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Regime Decision Panel ──────────────────────────────────────────────── */
+
+.regime-section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 14px 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.regime-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.regime-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.regime-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.regime-label-prefix {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.regime-badge {
+  font-size: 17px;
+  font-weight: 800;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+
+.regime-confidence {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.regime-pill {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--panel-2);
+  white-space: nowrap;
+}
+
+.regime-rec-block {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.regime-rec-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.regime-rec-name {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.regime-router-wrap {
+  overflow-x: auto;
+}
+
+.regime-router-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.regime-router-table th,
+.regime-router-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.regime-router-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.regime-router-table td.regime-reason {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: normal;
+}
+
+.regime-router-table td.regime-score {
+  font-variant-numeric: tabular-nums;
+}
+
+.regime-status-badge {
+  display: inline-block;
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-active {
+  background: rgba(76, 201, 176, 0.2);
+  color: var(--accent-2);
+  border: 1px solid var(--accent-2);
+}
+
+.status-allowed {
+  background: rgba(214, 255, 98, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(214, 255, 98, 0.4);
+}
+
+.status-watch {
+  background: rgba(242, 184, 75, 0.15);
+  color: var(--warning);
+  border: 1px solid rgba(242, 184, 75, 0.4);
+}
+
+.status-blocked {
+  background: rgba(255, 107, 107, 0.12);
+  color: var(--danger);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+.status-no_trade {
+  background: rgba(147, 161, 168, 0.12);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.regime-updated {
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 @media (max-width: 980px) {
