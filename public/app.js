@@ -52,12 +52,17 @@ let toastTimer;
 let lastTrades = [];
 let sortState = { col: null, asc: true };
 let adviceLines = [];
+let focusedTrade = null;
+let focusLines = [];
+let chartResolution = null;
 
 const metricDefs = [
   ["trades", "Trades"],
   ["winRate", "Winrate", "%"],
   ["profitFactor", "Profit factor"],
-  ["totalR", "Total R"],
+  ["grossTotalR", "Gross R"],
+  ["totalCostR", "Kosten R"],
+  ["totalR", "Net R"],
   ["averageR", "Avg R"],
   ["averageScore", "Avg score"],
   ["maxDrawdownR", "Max DD R"]
@@ -124,7 +129,9 @@ function resolveOptions(data) {
     minimumScoreToTrade: isSMC
       ? Number(data.get("smcMinimumScoreToTrade") ?? 65)
       : Number(data.get("minimumScoreToTrade") ?? 70),
-    entryModel: data.get("entryModel") ?? "balanced"
+    entryModel: data.get("entryModel") ?? "balanced",
+    feePct: Number(data.get("feePct") ?? 0.05),
+    slippagePct: Number(data.get("slippagePct") ?? 0.02)
   };
 }
 
@@ -293,12 +300,123 @@ function ensureChart() {
   });
 }
 
+function clearFocusLines() {
+  for (const line of focusLines) {
+    try { candleSeries.removePriceLine(line); } catch {}
+  }
+  focusLines = [];
+}
+
+function focusTrade(trade) {
+  if (!chart || !candleSeries) return;
+  focusedTrade = trade;
+  clearFocusLines();
+
+  const isLong = trade.direction === "long";
+
+  focusLines.push(candleSeries.createPriceLine({
+    price: trade.entry,
+    color: isLong ? "#4cc9b0" : "#ff9966",
+    lineWidth: 2,
+    lineStyle: LightweightCharts.LineStyle.Solid,
+    title: `Entry (${trade.id ?? ""})`,
+    axisLabelVisible: true
+  }));
+
+  focusLines.push(candleSeries.createPriceLine({
+    price: trade.stop,
+    color: "#ff4040",
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.Dashed,
+    title: "Stop",
+    axisLabelVisible: true
+  }));
+
+  for (const partial of trade.partials ?? []) {
+    if (!Number.isFinite(partial.price)) continue;
+    focusLines.push(candleSeries.createPriceLine({
+      price: partial.price,
+      color: partial.hit ? "#d6ff62" : "rgba(214,255,98,0.3)",
+      lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.Dotted,
+      title: `TP${partial.r}R${partial.hit ? " ✓" : ""}`,
+      axisLabelVisible: false
+    }));
+  }
+
+  // Zoom to the trade's time range with breathing room
+  const duration = Math.max(trade.exitTime - trade.entryTime, 3600);
+  const pad = duration * 0.5;
+  try {
+    chart.timeScale().setVisibleRange({
+      from: trade.entryTime - pad,
+      to:   trade.exitTime  + pad
+    });
+  } catch {}
+
+  document.querySelectorAll("#trades-body tr").forEach(row => {
+    const active = row.dataset.tradeEntry === String(trade.entryTime);
+    row.classList.toggle("focused-trade", active);
+    if (active) row.scrollIntoView({ block: "nearest" });
+  });
+
+  document.getElementById("chart-reset-view")?.classList.remove("hidden");
+}
+
+function resetFocus() {
+  focusedTrade = null;
+  clearFocusLines();
+  document.querySelectorAll("#trades-body tr").forEach(row => row.classList.remove("focused-trade"));
+  document.getElementById("chart-reset-view")?.classList.add("hidden");
+  chart?.timeScale().fitContent();
+}
+
+async function loadChartCandles(resolution) {
+  if (!chart) return;
+  const instrument = instrumentEl.value;
+  const lookbackDays = Number(form.elements.lookbackDays.value);
+  chartResolution = resolution;
+
+  document.querySelectorAll(".tf-btn[data-resolution]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.resolution === resolution);
+  });
+
+  try {
+    clearFocusLines();
+    const { candles } = await getJson(
+      `/api/candles?instrument=${encodeURIComponent(instrument)}&resolution=${encodeURIComponent(resolution)}&lookbackDays=${lookbackDays}`
+    );
+    candleSeries.setData(candles.map(c => ({
+      time: c.time, open: c.open, high: c.high, low: c.low, close: c.close
+    })));
+    candleSeries.setMarkers(buildMarkers(lastTrades));
+    if (focusedTrade) {
+      focusTrade(focusedTrade);
+    } else {
+      chart.timeScale().fitContent();
+    }
+  } catch {
+    showToast("Candles konden niet worden geladen");
+  }
+}
+
 function renderResult(result) {
   ensureChart();
   strategyLabelEl.textContent = result.strategyName ?? result.strategy;
   titleEl.textContent =
     `${result.instrumentName} · ${result.entryResolution} entries · ` +
     `${result.levelResolution} levels · ${formatStopMode(result.options.stopMode)}`;
+
+  // Reset focus state before loading new data
+  focusedTrade = null;
+  clearFocusLines();
+  document.getElementById("chart-reset-view")?.classList.add("hidden");
+
+  // Update active timeframe button
+  chartResolution = result.entryResolution;
+  document.querySelectorAll(".tf-btn[data-resolution]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.resolution === result.entryResolution);
+  });
 
   candleSeries.setData(
     result.entryCandles.map((candle) => ({
@@ -746,7 +864,11 @@ function renderMetrics(metrics) {
     .filter(([key]) => metrics[key] !== undefined)
     .map(([key, label, suffix = ""]) => {
       const value = metrics[key] ?? 0;
-      const className = key.includes("R") && value < 0 ? "negative" : "";
+      let className = "";
+      if (key === "totalCostR") className = "negative";
+      else if (key === "grossTotalR") className = value >= 0 ? "positive" : "negative";
+      else if (key === "totalR") className = value >= 0 ? "positive" : "negative";
+      else if (key.includes("R") && value < 0) className = "negative";
       return `
         <div class="metric">
           <span>${label}</span>
@@ -794,8 +916,8 @@ function renderTrades(trades) {
   tradesBodyEl.innerHTML = sortTrades(trades)
     .map(
       (trade) => `
-        <tr>
-          <td>${trade.id}</td>
+        <tr data-trade-entry="${trade.entryTime}" class="${focusedTrade?.entryTime === trade.entryTime ? "focused-trade" : ""}">
+          <td>${trade.id ?? "-"}</td>
           <td>${trade.direction}</td>
           <td>${formatPrice(trade.entry)}</td>
           <td>${formatPrice(trade.stop)}</td>
@@ -807,6 +929,19 @@ function renderTrades(trades) {
       `
     )
     .join("");
+
+  tradesBodyEl.querySelectorAll("tr[data-trade-entry]").forEach(row => {
+    row.addEventListener("click", () => {
+      const entryTime = Number(row.dataset.tradeEntry);
+      const trade = lastTrades.find(t => t.entryTime === entryTime);
+      if (!trade) return;
+      if (focusedTrade?.entryTime === trade.entryTime) {
+        resetFocus();
+      } else {
+        focusTrade(trade);
+      }
+    });
+  });
 }
 
 function configureLiveRefresh() {
@@ -996,6 +1131,12 @@ savePresetEl.addEventListener("click", saveCurrentPreset);
 deletePresetEl.addEventListener("click", deleteSelectedPreset);
 presetSelectEl.addEventListener("change", applySelectedPreset);
 liveRefreshEl.addEventListener("change", configureLiveRefresh);
+
+document.querySelectorAll(".tf-btn[data-resolution]").forEach(btn => {
+  btn.addEventListener("click", () => loadChartCandles(btn.dataset.resolution));
+});
+
+document.getElementById("chart-reset-view")?.addEventListener("click", resetFocus);
 
 document.querySelectorAll("th[data-sort]").forEach((th) => {
   th.addEventListener("click", () => {

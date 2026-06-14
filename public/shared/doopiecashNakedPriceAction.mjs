@@ -13,6 +13,8 @@ const DEFAULT_OPTIONS = {
   stopBufferPct: 0.05,
   stopMode: "structure",
   maxHoldBars: 240,
+  feePct: 0.05,
+  slippagePct: 0.02,
   direction: "both",
   partials: [
     { r: 1, size: 0.33 },
@@ -227,7 +229,9 @@ function playTrade(m3, signalIndex, setup, context, config) {
     stop:                setup.stop.price,
     partials:            config.partials,
     moveStopToBEAfterTP: 1,
-    maxHoldBars:         config.maxHoldBars
+    maxHoldBars:         config.maxHoldBars,
+    feePct:              config.feePct ?? 0,
+    slippagePct:         config.slippagePct ?? 0
   });
   if (!result) return null;
 

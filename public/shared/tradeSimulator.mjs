@@ -26,10 +26,15 @@ export function simulateTrade(candles, {
   partials,
   moveStopToBEAfterTP = 1,
   maxHoldBars = 180,
-  meta = {}
+  meta = {},
+  feePct = 0,
+  slippagePct = 0
 }) {
   const risk = Math.abs(entry - stop);
   if (!Number.isFinite(risk) || risk <= 0) return null;
+
+  // Both entry and exit sides: 2 × (fee + slippage) expressed as R-multiples
+  const costR = entry > 0 ? round(2 * (feePct + slippagePct) / 100 * entry / risk, 4) : 0;
 
   const isLong = direction === "long";
 
@@ -117,7 +122,9 @@ export function simulateTrade(candles, {
     exitPrice: round(exitPrice, 8),
     exitReason,
     risk:      round(risk, 8),
-    rMultiple: round(realizedR, 3),
+    grossRMultiple: round(realizedR, 3),
+    costR,
+    rMultiple: round(realizedR - costR, 3),
     maxFavorableExcursionR: round(maxFavR, 2),
     maxAdverseExcursionR:   round(maxAdvR, 2),
     partials: partialSlots.map(({ r, size, price, hit }) => ({ r, size, price, hit }))
@@ -127,11 +134,13 @@ export function simulateTrade(candles, {
 // ─── Shared metrics ───────────────────────────────────────────────────────────
 
 export function calculateMetrics(trades) {
-  const wins     = trades.filter(t => t.rMultiple > 0);
-  const losses   = trades.filter(t => t.rMultiple < 0);
-  const grossWin = wins.reduce((s, t) => s + t.rMultiple, 0);
+  const wins      = trades.filter(t => t.rMultiple > 0);
+  const losses    = trades.filter(t => t.rMultiple < 0);
+  const grossWin  = wins.reduce((s, t) => s + t.rMultiple, 0);
   const grossLoss = Math.abs(losses.reduce((s, t) => s + t.rMultiple, 0));
-  const totalR   = trades.reduce((s, t) => s + t.rMultiple, 0);
+  const totalR    = trades.reduce((s, t) => s + t.rMultiple, 0);
+  const grossTotalR = trades.reduce((s, t) => s + (t.grossRMultiple ?? t.rMultiple), 0);
+  const totalCostR  = trades.reduce((s, t) => s + (t.costR ?? 0), 0);
   const avgScore = trades.length
     ? trades.reduce((s, t) => s + (t.score ?? 0), 0) / trades.length
     : 0;
@@ -143,6 +152,8 @@ export function calculateMetrics(trades) {
     losses:       losses.length,
     winRate:      trades.length ? round(wins.length / trades.length * 100, 1) : 0,
     profitFactor: grossLoss > 0 ? round(grossWin / grossLoss, 2) : round(grossWin, 2),
+    grossTotalR:  round(grossTotalR, 2),
+    totalCostR:   round(totalCostR, 2),
     totalR:       round(totalR, 2),
     averageR:     trades.length ? round(totalR / trades.length, 2) : 0,
     averageScore: round(avgScore, 1),

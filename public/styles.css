@@ -176,6 +176,23 @@ select:focus {
   opacity: 0.7;
 }
 
+.cost-details {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.cost-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  user-select: none;
+}
+
+.cost-details[open] summary {
+  margin-bottom: 10px;
+}
+
 .check-row {
   display: flex;
   align-items: center;
@@ -423,11 +440,58 @@ select:focus {
   min-height: 360px;
 }
 
+.chart-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+
 .chart-legend {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  padding-bottom: 8px;
+  flex: 1;
+}
+
+.chart-tf-buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.tf-btn {
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.tf-btn:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.tf-btn.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.tf-btn.tf-btn-reset {
+  color: var(--warning);
+  border-color: transparent;
+}
+
+.tf-btn.tf-btn-reset:hover {
+  border-color: var(--warning);
 }
 
 .legend-group {
@@ -654,6 +718,21 @@ th {
 th[data-sort] {
   cursor: pointer;
   user-select: none;
+}
+
+#trades-body tr {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+#trades-body tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+#trades-body tr.focused-trade {
+  background: rgba(214, 255, 98, 0.07);
+  outline: 1px solid rgba(214, 255, 98, 0.3);
+  outline-offset: -1px;
 }
 
 th[data-sort]:hover {

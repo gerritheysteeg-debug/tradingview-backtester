@@ -11,6 +11,8 @@ const DEFAULT_OPTIONS = {
   stopBufferPct: 0.1,
   minRR: 2.0,
   maxHoldBars: 120,
+  feePct: 0.05,
+  slippagePct: 0.02,
   minimumScoreToTrade: 55,
   direction: "both",
   partials: [
@@ -252,6 +254,8 @@ function simulateVolatilityExpansionTrades(candles, compressionBlocks, bias, con
         partials:            config.partials,
         moveStopToBEAfterTP: 1,
         maxHoldBars:         config.maxHoldBars,
+        feePct:              config.feePct ?? 0,
+        slippagePct:         config.slippagePct ?? 0,
         meta: {
           id:       `VE${tradeNum}`,
           tp1:      round(tp1, 1),

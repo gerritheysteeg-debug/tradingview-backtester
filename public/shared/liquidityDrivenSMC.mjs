@@ -7,6 +7,8 @@ const DEFAULT_OPTIONS = {
   maxBarsToReclaim: 5,
   maxBarsForChoch: 20,
   maxHoldBars: 240,
+  feePct: 0.05,
+  slippagePct: 0.02,
   minRR: 2.0,
   entryModel: "balanced",
   minimumScoreToTrade: 65,
@@ -470,7 +472,9 @@ function playTrade(m3, signalIndex, setup, config) {
     stop:                setup.stop,
     partials:            config.partials,
     moveStopToBEAfterTP: 1,
-    maxHoldBars:         config.maxHoldBars
+    maxHoldBars:         config.maxHoldBars,
+    feePct:              config.feePct ?? 0,
+    slippagePct:         config.slippagePct ?? 0
   });
   if (!result) return null;
 

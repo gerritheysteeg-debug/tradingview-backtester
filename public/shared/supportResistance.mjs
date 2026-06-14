@@ -10,6 +10,8 @@ const DEFAULT_OPTIONS = {
   stopMode: "swing",
   swingStopLookback: 12,
   maxHoldBars: 180,
+  feePct: 0.05,
+  slippagePct: 0.02,
   maxLevelAgeDays: 0,
   direction: "both",
   partials: [
@@ -307,6 +309,8 @@ function playTrade(candles, signalIndex, setup, config) {
     partials:          config.partials,
     moveStopToBEAfterTP: 1,
     maxHoldBars:       config.maxHoldBars,
+    feePct:            config.feePct ?? 0,
+    slippagePct:       config.slippagePct ?? 0,
     meta: {
       signalIndex,
       signalTime:    candles[signalIndex].time,

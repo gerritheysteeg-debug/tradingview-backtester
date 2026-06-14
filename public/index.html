@@ -157,6 +157,20 @@
             </div>
           </div>
 
+          <details class="cost-details">
+            <summary>Executiekosten</summary>
+            <div class="field-grid">
+              <label>
+                Fee % (per side)
+                <input id="fee-pct" name="feePct" type="number" min="0" max="1" step="0.01" value="0.05" title="Bijv. 0.05 voor Deribit taker">
+              </label>
+              <label>
+                Slippage %
+                <input id="slippage-pct" name="slippagePct" type="number" min="0" max="1" step="0.01" value="0.02">
+              </label>
+            </div>
+          </details>
+
           <button class="primary-button" type="submit">
             Run backtest
           </button>
@@ -202,19 +216,29 @@
         </section>
 
         <section class="chart-section">
-          <div class="chart-legend">
-            <div class="legend-group" id="legend-price">
-              <span class="legend-item"><span class="legend-line level-line"></span>S/R niveau</span>
-              <span class="legend-item"><span class="legend-line entry-long-line"></span>Entry long</span>
-              <span class="legend-item"><span class="legend-line entry-short-line"></span>Entry short</span>
-              <span class="legend-item"><span class="legend-line stop-line"></span>Stop</span>
-              <span class="legend-item"><span class="legend-line tp-line"></span>Take profit</span>
+          <div class="chart-topbar">
+            <div class="chart-legend">
+              <div class="legend-group" id="legend-price">
+                <span class="legend-item"><span class="legend-line level-line"></span>S/R niveau</span>
+                <span class="legend-item"><span class="legend-line entry-long-line"></span>Entry long</span>
+                <span class="legend-item"><span class="legend-line entry-short-line"></span>Entry short</span>
+                <span class="legend-item"><span class="legend-line stop-line"></span>Stop</span>
+                <span class="legend-item"><span class="legend-line tp-line"></span>Take profit</span>
+              </div>
+              <div class="legend-group hidden" id="legend-mc">
+                <span class="legend-item"><span class="legend-line eq-line"></span>Equity curve</span>
+                <span class="legend-item"><span class="legend-line mc-p95-line"></span>MC P95 (beste 5%)</span>
+                <span class="legend-item"><span class="legend-line mc-p50-line"></span>MC mediaan</span>
+                <span class="legend-item"><span class="legend-line mc-p5-line"></span>MC P5 (slechtste 5%)</span>
+              </div>
             </div>
-            <div class="legend-group hidden" id="legend-mc">
-              <span class="legend-item"><span class="legend-line eq-line"></span>Equity curve</span>
-              <span class="legend-item"><span class="legend-line mc-p95-line"></span>MC P95 (beste 5%)</span>
-              <span class="legend-item"><span class="legend-line mc-p50-line"></span>MC mediaan</span>
-              <span class="legend-item"><span class="legend-line mc-p5-line"></span>MC P5 (slechtste 5%)</span>
+            <div class="chart-tf-buttons">
+              <button class="tf-btn" data-resolution="3m">3m</button>
+              <button class="tf-btn" data-resolution="15m">15m</button>
+              <button class="tf-btn" data-resolution="1h">1h</button>
+              <button class="tf-btn" data-resolution="4h">4h</button>
+              <button class="tf-btn" data-resolution="1D">1D</button>
+              <button class="tf-btn tf-btn-reset hidden" id="chart-reset-view">Alles</button>
             </div>
           </div>
           <div id="chart" class="chart"></div>

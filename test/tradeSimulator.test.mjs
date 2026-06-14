@@ -214,6 +214,49 @@ test("returns null when risk is zero", () => {
   assert.equal(result, null);
 });
 
+test("feePct + slippagePct reduce rMultiple and expose grossRMultiple", () => {
+  // Long entry 100, stop 90 (risk=10).
+  // costR = 2*(feePct+slippagePct)/100 * entry/risk
+  //       = 2*(0.05+0.02)/100 * 100/10
+  //       = 2 * 0.07/100 * 10
+  //       = 0.0014 * 10 = 0.014R
+  // Stop hit → grossR = -1R, net = -1 - 0.014 = -1.014R
+  const candles = [
+    c(1, { open: 100, high: 101, low: 89, close: 95 })
+  ];
+  const result = simulateTrade(candles, {
+    direction: "long",
+    entryIndex: 0,
+    entry: 100,
+    stop: 90,
+    partials: PARTIALS,
+    feePct: 0.05,
+    slippagePct: 0.02
+  });
+
+  assert.equal(result.grossRMultiple, -1);
+  assert.equal(result.costR, 0.014);
+  assert.equal(result.rMultiple, -1.014);
+});
+
+test("feePct=0 slippagePct=0 leaves rMultiple equal to grossRMultiple", () => {
+  const candles = [
+    c(1, { open: 100, high: 135, low: 100, close: 130 })
+  ];
+  const result = simulateTrade(candles, {
+    direction: "long",
+    entryIndex: 0,
+    entry: 100,
+    stop: 90,
+    partials: PARTIALS,
+    feePct: 0,
+    slippagePct: 0
+  });
+
+  assert.equal(result.costR, 0);
+  assert.equal(result.rMultiple, result.grossRMultiple);
+});
+
 // ─── calculateMetrics ─────────────────────────────────────────────────────────
 
 test("calculateMetrics computes win rate and profit factor", () => {

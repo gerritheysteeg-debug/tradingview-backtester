@@ -8,6 +8,8 @@ const DEFAULT_OPTIONS = {
   stopBufferPct: 0.1,
   minRR: 2.0,
   maxHoldBars: 160,
+  feePct: 0.05,
+  slippagePct: 0.02,
   minimumScoreToTrade: 60,
   direction: "both",
   dailyBiasLookback: 20,
@@ -239,6 +241,8 @@ function simulateTrendPullbackTrades(candles, zones, trend, config) {
         partials:            config.partials,
         moveStopToBEAfterTP: 1,
         maxHoldBars:         config.maxHoldBars,
+        feePct:              config.feePct ?? 0,
+        slippagePct:         config.slippagePct ?? 0,
         meta: {
           id:       `TP${tradeNum}`,
           tp1:      round(tp1, 1),

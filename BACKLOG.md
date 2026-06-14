@@ -17,20 +17,35 @@
 - [x] Deribit instrument picker per currency en instrument type.
 - [x] Strategy parameters opslaan als presets.
 - [x] Level 2 stop loss optie naast swing stop.
-- [ ] Trend break / retest entry-module.
-- [ ] Multi-timeframe confluence score: 1W, 1D, 4h, entry timeframe.
 - [x] Doopiecash Naked Price Action als tweede strategie toevoegen.
-- [ ] Doopiecash v2: maandelijkse context en meer precieze wick-fill targets toevoegen.
-- [ ] Doopiecash v2: setup-uitleg per trade zichtbaar maken in detailpaneel.
-- [ ] Presets importeren/exporteren als JSON.
-- [ ] Presets vergelijken op performance.
-- [ ] Walk-forward test en out-of-sample splits.
-- [ ] Monte Carlo analyse voor drawdown en losing streaks.
-- [ ] TradingView webhook endpoint voor alerts uit Pine Script.
-- [ ] Paper trading mode met journaling.
-- [ ] Aandelen-data provider toevoegen.
-- [ ] Goud/zilver via futures, CFD of broker/data-provider toevoegen.
-- [ ] Rapport export naar CSV/PDF.
+- [x] Liquidity Driven / SMC-lite als derde strategie toevoegen.
+- [x] Trend Pullback v1 als vierde strategie toevoegen.
+- [x] Volatility Expansion v1 als vijfde strategie toevoegen.
+- [x] Market Regime Engine v1 als zesde strategie toevoegen.
+- [x] Strategie-documentatiepagina's per strategie (HTML docs).
+- [x] Shared trade execution engine (tradeSimulator.mjs) voor consistente stop/TP/BE-logica.
+- [x] Break-even bug in trendPullback.mjs opgelost.
+- [x] Monte Carlo analyse voor drawdown en losing streaks.
+- [x] CSV-export van trades.
+- [x] Correlatie & streak-analyse panel.
+- [x] Maandelijks breakdown tabel.
+- [x] Live marktadvies (3-koloms: Swing / Day / Scalp).
+- [x] Chart timeframe switcher (3m / 15m / 1h / 4h / 1D).
+- [x] Trade focus: klik op trade-row → chart zoomt in met entry/stop/TP-lijnen.
+- [x] Executiekosten: feePct + slippagePct in simulator (gross vs net R).
+- [x] Testdekking: tradeSimulator (22 tests), supportResistance, trendPullback, volatilityExpansion, scan edge cases (45 tests totaal).
+
+## Volgende sprint — betrouwbaarheid & realisme
+
+- [ ] Walk-forward / out-of-sample splits (in-sample vs out-of-sample venster instellen in UI).
+- [ ] Backtest-realisme: candle-intrabar ambiguïteit (hoog/laag volgorde onbekend).
+- [ ] Backtest-realisme: funding rate impact voor perpetuals (per 8 uur).
+- [ ] Live advies endpoint hard testen (lege data, rare parameters, Deribit-fouten).
+- [ ] Doopiecash v2: maandelijkse context en meer precieze wick-fill targets.
+- [ ] Doopiecash v2: setup-uitleg per trade zichtbaar in detailpaneel.
+- [ ] SMC/Doopiecash testfixtures met verwachte signalen (entry/stop/TP/R).
+- [ ] Instrument-filter: standaard alleen BTC/ETH/PAXG/BNB/SOL tonen.
+- [ ] Multi-timeframe confluence score: 1W, 1D, 4h, entry timeframe.
 
 ## Later pas met expliciete toestemming
 
@@ -38,3 +53,9 @@
 - [ ] Broker/exchange account uitlezen.
 - [ ] Live orders plaatsen.
 - [ ] Automatische order management.
+- [ ] Presets importeren/exporteren als JSON.
+- [ ] Presets vergelijken op performance.
+- [ ] TradingView webhook endpoint voor alerts uit Pine Script.
+- [ ] Paper trading mode met journaling.
+- [ ] Aandelen-data provider toevoegen.
+- [ ] Goud/zilver via futures, CFD of broker/data-provider toevoegen.
