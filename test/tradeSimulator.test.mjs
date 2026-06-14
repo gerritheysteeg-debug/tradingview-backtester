@@ -257,6 +257,62 @@ test("feePct=0 slippagePct=0 leaves rMultiple equal to grossRMultiple", () => {
   assert.equal(result.rMultiple, result.grossRMultiple);
 });
 
+test("fundingRatePct8h accumulates per 8h period held", () => {
+  // Long entry 100, stop 90 (risk=10). 3m candles, each 180s apart.
+  // Trade held from time=0 to time=86400 (24h) → 3 periods of 8h.
+  // fundingCostR = 3 * 0.01/100 * 100/10 = 3 * 0.001 = 0.003R
+  const candles = Array.from({ length: 290 }, (_, i) => ({
+    time: i * 300, open: 100, high: 100.5, low: 99.8, close: 100.2, volume: 100
+  }));
+  const result = simulateTrade(candles, {
+    direction: "long",
+    entryIndex: 0,
+    entry: 100,
+    stop: 90,
+    partials: PARTIALS,
+    maxHoldBars: 288,  // 288 × 300s = 86400s = 24h
+    fundingRatePct8h: 0.01
+  });
+
+  assert.ok(result.fundingCostR > 0, "funding cost must be positive");
+  assert.ok(result.rMultiple < result.grossRMultiple - result.costR,
+    "rMultiple must be reduced by funding cost");
+});
+
+test("intrabarOrder pessimistic: stop wins over TP on same candle (long)", () => {
+  // Long entry 100, stop 90 (risk=10), TP1=110. Candle: low=88 (stop hit) AND high=115 (TP1 hit).
+  // Pessimistic = stop resolved first → full -1R
+  const candles = [c(1, { open: 100, high: 115, low: 88, close: 105 })];
+  const result = simulateTrade(candles, {
+    direction: "long",
+    entryIndex: 0,
+    entry: 100,
+    stop: 90,
+    partials: PARTIALS,
+    intrabarOrder: "pessimistic"
+  });
+  assert.equal(result.exitReason, "stop");
+  assert.equal(result.grossRMultiple, -1);
+});
+
+test("intrabarOrder optimistic: TP wins over stop on same candle (long)", () => {
+  // Same setup. Optimistic = TP1 resolved first → partial +0.33R, then BE-stop hit → 0R on rest.
+  const candles = [c(1, { open: 100, high: 115, low: 88, close: 105 })];
+  const result = simulateTrade(candles, {
+    direction: "long",
+    entryIndex: 0,
+    entry: 100,
+    stop: 90,
+    partials: PARTIALS,
+    moveStopToBEAfterTP: 1,
+    intrabarOrder: "optimistic"
+  });
+  // TP1 hit first → +0.33R partial; stop moves to BE (100); low=88 hits BE → 0R on remaining
+  assert.equal(result.exitReason, "breakeven_stop");
+  assert.ok(result.grossRMultiple > -1, "optimistic should be better than -1R");
+  assert.ok(result.grossRMultiple > 0, "optimistic with TP1 hit should yield positive gross R");
+});
+
 // ─── calculateMetrics ─────────────────────────────────────────────────────────
 
 test("calculateMetrics computes win rate and profit factor", () => {

@@ -15,6 +15,8 @@ const DEFAULT_OPTIONS = {
   maxHoldBars: 240,
   feePct: 0.05,
   slippagePct: 0.02,
+  fundingRatePct8h: 0,
+  intrabarOrder: "pessimistic",
   direction: "both",
   partials: [
     { r: 1, size: 0.33 },
@@ -231,7 +233,9 @@ function playTrade(m3, signalIndex, setup, context, config) {
     moveStopToBEAfterTP: 1,
     maxHoldBars:         config.maxHoldBars,
     feePct:              config.feePct ?? 0,
-    slippagePct:         config.slippagePct ?? 0
+    slippagePct:         config.slippagePct ?? 0,
+    fundingRatePct8h:    config.fundingRatePct8h ?? 0,
+    intrabarOrder:       config.intrabarOrder ?? "pessimistic"
   });
   if (!result) return null;
 

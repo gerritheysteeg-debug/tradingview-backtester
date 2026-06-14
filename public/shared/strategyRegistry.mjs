@@ -1,4 +1,5 @@
 import { runSupportResistanceBacktest, scanSupportResistance } from "./supportResistance.mjs";
+import { calculateMetrics } from "./tradeSimulator.mjs";
 import { runDoopiecashNakedPriceActionBacktest, scanDoopiecashNakedPriceAction } from "./doopiecashNakedPriceAction.mjs";
 import { runLiquidityDrivenSMCBacktest, scanLiquidityDrivenSMC } from "./liquidityDrivenSMC.mjs";
 import { runTrendPullbackBacktest, scanTrendPullback } from "./trendPullback.mjs";
@@ -89,16 +90,38 @@ export function runStrategyBacktest({
   options = {}
 }) {
   const strategy = getStrategy(strategyId);
-  const result = strategy.run({
-    entryCandles,
-    levelCandles,
-    candlesByResolution,
-    options
-  });
+  const result = strategy.run({ entryCandles, levelCandles, candlesByResolution, options });
+
+  // Walk-forward: split trades into in-sample (IS) and out-of-sample (OOS) by entry time.
+  const oosPct = Number(options.outOfSamplePct ?? 0);
+  let walkForward = null;
+
+  if (oosPct > 0 && oosPct < 100 && result.trades?.length > 0) {
+    const allCandles = entryCandles.length
+      ? entryCandles
+      : (Object.values(candlesByResolution).find(c => c?.length > 1) ?? []);
+
+    if (allCandles.length >= 2) {
+      const firstTime = allCandles[0].time;
+      const lastTime  = allCandles.at(-1).time;
+      const splitTime = firstTime + (lastTime - firstTime) * (1 - oosPct / 100);
+
+      const isTrades  = result.trades.filter(t => t.entryTime <  splitTime);
+      const oosTrades = result.trades.filter(t => t.entryTime >= splitTime);
+
+      walkForward = {
+        splitTime,
+        oosPct,
+        metricsIS:  calculateMetrics(isTrades),
+        metricsOOS: calculateMetrics(oosTrades)
+      };
+    }
+  }
 
   return {
     ...result,
-    strategy: strategy.id,
-    strategyName: strategy.name
+    strategy:     strategy.id,
+    strategyName: strategy.name,
+    ...(walkForward && { walkForward })
   };
 }

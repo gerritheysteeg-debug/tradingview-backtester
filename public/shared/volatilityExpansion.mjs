@@ -13,6 +13,8 @@ const DEFAULT_OPTIONS = {
   maxHoldBars: 120,
   feePct: 0.05,
   slippagePct: 0.02,
+  fundingRatePct8h: 0,
+  intrabarOrder: "pessimistic",
   minimumScoreToTrade: 55,
   direction: "both",
   partials: [
@@ -256,6 +258,8 @@ function simulateVolatilityExpansionTrades(candles, compressionBlocks, bias, con
         maxHoldBars:         config.maxHoldBars,
         feePct:              config.feePct ?? 0,
         slippagePct:         config.slippagePct ?? 0,
+        fundingRatePct8h:    config.fundingRatePct8h ?? 0,
+        intrabarOrder:       config.intrabarOrder ?? "pessimistic",
         meta: {
           id:       `VE${tradeNum}`,
           tp1:      round(tp1, 1),

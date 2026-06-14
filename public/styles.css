@@ -206,7 +206,7 @@ select:focus {
 
 .workspace {
   display: grid;
-  grid-template-rows: auto auto auto auto minmax(420px, 1fr) auto auto;
+  grid-template-rows: auto auto auto auto auto minmax(420px, 1fr) auto auto;
   gap: 18px;
   padding: 22px;
   min-width: 0;
@@ -795,6 +795,85 @@ th[data-sort].sort-desc::after {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ─── Walk-forward panel ─────────────────────────────────────────────────── */
+
+.walkforward-section {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--warning);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 14px 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.wf-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wf-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--warning);
+}
+
+.wf-split-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.wf-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.wf-col-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+
+.wf-col-label.oos {
+  color: var(--accent-2);
+}
+
+.wf-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wf-stat {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  padding: 8px 12px;
+  min-width: 70px;
+}
+
+.wf-stat small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.wf-stat strong {
+  font-size: 16px;
+}
+
+.wf-stat strong.warning { color: var(--warning); }
 
 /* ─── Regime Decision Panel ──────────────────────────────────────────────── */
 

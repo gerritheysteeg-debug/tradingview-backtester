@@ -10,6 +10,8 @@ const DEFAULT_OPTIONS = {
   maxHoldBars: 160,
   feePct: 0.05,
   slippagePct: 0.02,
+  fundingRatePct8h: 0,
+  intrabarOrder: "pessimistic",
   minimumScoreToTrade: 60,
   direction: "both",
   dailyBiasLookback: 20,
@@ -243,6 +245,8 @@ function simulateTrendPullbackTrades(candles, zones, trend, config) {
         maxHoldBars:         config.maxHoldBars,
         feePct:              config.feePct ?? 0,
         slippagePct:         config.slippagePct ?? 0,
+        fundingRatePct8h:    config.fundingRatePct8h ?? 0,
+        intrabarOrder:       config.intrabarOrder ?? "pessimistic",
         meta: {
           id:       `TP${tradeNum}`,
           tp1:      round(tp1, 1),

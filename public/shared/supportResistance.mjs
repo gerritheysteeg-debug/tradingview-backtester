@@ -12,6 +12,8 @@ const DEFAULT_OPTIONS = {
   maxHoldBars: 180,
   feePct: 0.05,
   slippagePct: 0.02,
+  fundingRatePct8h: 0,
+  intrabarOrder: "pessimistic",
   maxLevelAgeDays: 0,
   direction: "both",
   partials: [
@@ -311,6 +313,8 @@ function playTrade(candles, signalIndex, setup, config) {
     maxHoldBars:       config.maxHoldBars,
     feePct:            config.feePct ?? 0,
     slippagePct:       config.slippagePct ?? 0,
+    fundingRatePct8h:  config.fundingRatePct8h ?? 0,
+    intrabarOrder:     config.intrabarOrder ?? "pessimistic",
     meta: {
       signalIndex,
       signalTime:    candles[signalIndex].time,

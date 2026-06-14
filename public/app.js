@@ -39,6 +39,10 @@ const adviceCardsDayEl   = document.querySelector("#advice-cards-day");
 const adviceCardsScalpEl = document.querySelector("#advice-cards-scalp");
 const adviceTimeEl = document.querySelector("#advice-time");
 const refreshAdviceEl = document.querySelector("#refresh-advice");
+const walkforwardSectionEl = document.querySelector("#walkforward-section");
+const wfSplitLabelEl = document.querySelector("#wf-split-label");
+const wfMetricsIsEl = document.querySelector("#wf-metrics-is");
+const wfMetricsOosEl = document.querySelector("#wf-metrics-oos");
 const regimeCheckEl = document.querySelector("#regime-check");
 const regimeSectionEl = document.querySelector("#regime-section");
 const regimeBadgeEl = document.querySelector("#regime-badge");
@@ -71,6 +75,7 @@ const metricDefs = [
   ["profitFactor", "Profit factor"],
   ["grossTotalR", "Gross R"],
   ["totalCostR", "Kosten R"],
+  ["totalFundingR", "Funding R"],
   ["totalR", "Net R"],
   ["averageR", "Avg R"],
   ["averageScore", "Avg score"],
@@ -140,7 +145,10 @@ function resolveOptions(data) {
       : Number(data.get("minimumScoreToTrade") ?? 70),
     entryModel: data.get("entryModel") ?? "balanced",
     feePct: Number(data.get("feePct") ?? 0.05),
-    slippagePct: Number(data.get("slippagePct") ?? 0.02)
+    slippagePct: Number(data.get("slippagePct") ?? 0.02),
+    fundingRatePct8h: Number(data.get("fundingRatePct8h") ?? 0),
+    intrabarOrder: data.get("intrabarOrder") ?? "pessimistic",
+    outOfSamplePct: Number(data.get("outOfSamplePct") ?? 0)
   };
 }
 
@@ -409,6 +417,43 @@ async function loadChartCandles(resolution) {
   }
 }
 
+const WF_METRIC_DEFS = [
+  ["trades", "Trades"],
+  ["winRate", "Winrate", "%"],
+  ["profitFactor", "PF"],
+  ["totalR", "Net R"],
+  ["averageR", "Avg R"],
+  ["maxDrawdownR", "Max DD"]
+];
+
+function renderWalkForward(wf) {
+  if (!wf || !walkforwardSectionEl) return;
+  walkforwardSectionEl.classList.remove("hidden");
+
+  const splitDate = new Date(wf.splitTime * 1000).toLocaleDateString("nl-NL", {
+    day: "2-digit", month: "short", year: "numeric"
+  });
+  wfSplitLabelEl.textContent = `Splitpunt: ${splitDate} · OOS ${wf.oosPct}%`;
+
+  function buildMetrics(metrics, el) {
+    el.innerHTML = WF_METRIC_DEFS
+      .filter(([key]) => metrics[key] !== undefined)
+      .map(([key, label, suffix = ""]) => {
+        const value = metrics[key] ?? 0;
+        let cls = "";
+        if (key === "totalR" || key === "averageR") cls = value >= 0 ? "positive" : "negative";
+        if (key === "maxDrawdownR") cls = value > 2 ? "negative" : "warning";
+        return `<div class="wf-stat">
+          <small>${label}</small>
+          <strong class="${cls}">${value}${suffix}</strong>
+        </div>`;
+      }).join("");
+  }
+
+  buildMetrics(wf.metricsIS,  wfMetricsIsEl);
+  buildMetrics(wf.metricsOOS, wfMetricsOosEl);
+}
+
 function renderResult(result) {
   ensureChart();
   strategyLabelEl.textContent = result.strategyName ?? result.strategy;
@@ -440,6 +485,11 @@ function renderResult(result) {
   candleSeries.setMarkers(buildMarkers(result.trades));
   renderPriceLines(result.levels);
   renderMetrics(result.metrics);
+  if (result.walkForward) {
+    renderWalkForward(result.walkForward);
+  } else {
+    walkforwardSectionEl?.classList.add("hidden");
+  }
   renderLevels(result.levels);
   renderTrades(result.trades);
   clearMonteCarlo();
@@ -949,7 +999,7 @@ function renderMetrics(metrics) {
     .map(([key, label, suffix = ""]) => {
       const value = metrics[key] ?? 0;
       let className = "";
-      if (key === "totalCostR") className = "negative";
+      if (key === "totalCostR" || key === "totalFundingR") className = "negative";
       else if (key === "grossTotalR") className = value >= 0 ? "positive" : "negative";
       else if (key === "totalR") className = value >= 0 ? "positive" : "negative";
       else if (key.includes("R") && value < 0) className = "negative";

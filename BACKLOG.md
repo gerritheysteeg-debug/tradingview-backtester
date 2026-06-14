@@ -39,9 +39,9 @@
 
 ## Volgende sprint — betrouwbaarheid & realisme
 
-- [ ] Walk-forward / out-of-sample splits (in-sample vs out-of-sample venster instellen in UI).
-- [ ] Backtest-realisme: candle-intrabar ambiguïteit (hoog/laag volgorde onbekend).
-- [ ] Backtest-realisme: funding rate impact voor perpetuals (per 8 uur).
+- [x] Backtest-realisme: candle-intrabar ambiguïteit — intrabarOrder pessimistisch/optimistisch/willekeurig in simulator.
+- [x] Walk-forward / out-of-sample splits — outOfSamplePct optie, IS vs OOS metrics panel in UI.
+- [x] Backtest-realisme: funding rate impact voor perpetuals — fundingRatePct8h per 8u in simulator en UI.
 - [ ] Live advies endpoint hard testen (lege data, rare parameters, Deribit-fouten).
 - [ ] Doopiecash v2: maandelijkse context en meer precieze wick-fill targets.
 - [ ] Doopiecash v2: setup-uitleg per trade zichtbaar in detailpaneel.
