@@ -20,6 +20,8 @@ const DEFAULT_OPTIONS = {
   ]
 };
 
+import { simulateTrade, calculateMetrics, buildEquityCurve } from "./tradeSimulator.mjs";
+
 // ─── ATR ─────────────────────────────────────────────────────────────────────
 
 function atr(candles, length) {
@@ -242,72 +244,30 @@ function simulateVolatilityExpansionTrades(candles, compressionBlocks, bias, con
 
       if (score < config.minimumScoreToTrade) { block.breakoutHandled = true; continue; }
 
-      // Simulate exit
-      const partials = config.partials;
-      let exitIndex     = entryIndex;
-      let rMultiple     = 0;
-      let exitPrice     = entry;
-      let partialIdx    = 0;
-      let remainingSize = 1;
-      let stopMoved     = false;
-
-      for (let j = entryIndex; j < Math.min(m3.length, entryIndex + config.maxHoldBars); j++) {
-        const c = m3[j];
-        exitIndex = j;
-        exitPrice = c.close;
-
-        const curStop = stopMoved ? entry : stop;
-        const stopHit = direction === "long" ? c.low <= curStop : c.high >= curStop;
-        if (stopHit) {
-          rMultiple += remainingSize * ((direction === "long" ? curStop - entry : entry - curStop) / risk);
-          exitPrice = curStop;
-          break;
-        }
-
-        if (partialIdx < partials.length) {
-          const pt = partials[partialIdx];
-          const tgt = direction === "long"
-            ? entry + risk * pt.r
-            : entry - risk * pt.r;
-          const hit = direction === "long" ? c.high >= tgt : c.low <= tgt;
-          if (hit) {
-            rMultiple += pt.size * pt.r;
-            remainingSize -= pt.size;
-            partialIdx++;
-            if (partialIdx === 1) stopMoved = true; // move stop to BE after TP1
-          }
-        }
-
-        if (partialIdx >= partials.length && remainingSize > 0) {
-          rMultiple += remainingSize * ((direction === "long"
-            ? c.close - entry
-            : entry - c.close) / risk);
-          exitPrice = c.close;
-          break;
-        }
-      }
-
-      block.breakoutHandled = true;
-
-      trades.push({
-        id: `VE${tradeNum++}`,
+      const tradeResult = simulateTrade(m3, {
         direction,
-        entryTime:  entryBar.time,
         entryIndex,
-        entry:      round(entry, 1),
-        stop:       round(stop, 1),
-        tp1: round(tp1, 1),
-        tp2: round(tp2, 1),
-        tp3: round(tp3, 1),
-        exitTime:   m3[exitIndex]?.time ?? entryBar.time,
-        exitIndex,
-        exitPrice:  round(exitPrice, 1),
-        score,
-        rMultiple:  round(rMultiple, 3),
-        stopMode:   "range-boundary"
+        entry,
+        stop,
+        partials:            config.partials,
+        moveStopToBEAfterTP: 1,
+        maxHoldBars:         config.maxHoldBars,
+        meta: {
+          id:       `VE${tradeNum}`,
+          tp1:      round(tp1, 1),
+          tp2:      round(tp2, 1),
+          tp3:      round(tp3, 1),
+          score,
+          stopMode: "range-boundary"
+        }
       });
 
-      openUntilIndex = exitIndex;
+      block.breakoutHandled = true;
+      if (!tradeResult) continue;
+
+      tradeNum++;
+      trades.push(tradeResult);
+      openUntilIndex = tradeResult.exitIndex;
       break;
     }
   }
@@ -434,40 +394,3 @@ function round(v, decimals) {
   return Math.round(v * f) / f;
 }
 
-function calculateMetrics(trades) {
-  const wins     = trades.filter(t => t.rMultiple > 0);
-  const losses   = trades.filter(t => t.rMultiple < 0);
-  const grossWin = wins.reduce((s, t) => s + t.rMultiple, 0);
-  const grossLoss = Math.abs(losses.reduce((s, t) => s + t.rMultiple, 0));
-  const totalR   = trades.reduce((s, t) => s + t.rMultiple, 0);
-  const avgScore = trades.length ? trades.reduce((s, t) => s + t.score, 0) / trades.length : 0;
-  const equity   = buildEquityCurve(trades);
-  return {
-    trades:       trades.length,
-    wins:         wins.length,
-    losses:       losses.length,
-    winRate:      trades.length ? round((wins.length / trades.length) * 100, 1) : 0,
-    profitFactor: grossLoss ? round(grossWin / grossLoss, 2) : round(grossWin, 2),
-    totalR:       round(totalR, 2),
-    averageR:     trades.length ? round(totalR / trades.length, 2) : 0,
-    averageScore: round(avgScore, 1),
-    maxDrawdownR: round(maxDrawdown(equity), 2)
-  };
-}
-
-function buildEquityCurve(trades) {
-  let equity = 0;
-  return trades.map(t => {
-    equity += t.rMultiple;
-    return { time: t.exitTime, value: round(equity, 3) };
-  });
-}
-
-function maxDrawdown(eq) {
-  let peak = 0, worst = 0;
-  for (const pt of eq) {
-    peak  = Math.max(peak, pt.value);
-    worst = Math.min(worst, pt.value - peak);
-  }
-  return Math.abs(worst);
-}

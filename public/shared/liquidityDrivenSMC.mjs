@@ -1,3 +1,5 @@
+import { simulateTrade, calculateMetrics, buildEquityCurve } from "./tradeSimulator.mjs";
+
 const DEFAULT_OPTIONS = {
   equalLevelTolerancePct: 0.2,
   swingWindow: 3,
@@ -459,154 +461,36 @@ function gradeScore(score) {
 
 function playTrade(m3, signalIndex, setup, config) {
   const entryCandle = m3[signalIndex];
-  const entry = entryCandle.close;
-  const stop = setup.stop;
-  const risk = Math.abs(entry - stop);
-  if (!Number.isFinite(risk) || risk <= 0) return null;
+  if (!entryCandle || !m3[signalIndex + 1]) return null;
 
-  const partials = config.partials.map(p => ({
-    ...p,
-    hit: false,
-    price: setup.direction === "long" ? entry + risk * p.r : entry - risk * p.r
-  }));
-
-  let realizedR = 0;
-  let remaining = 1;
-  let activeStop = stop;
-  let exitIndex = signalIndex;
-  let exitTime = entryCandle.time;
-  let exitPrice = entry;
-  let exitReason = "time_exit";
-  let maxFavR = 0;
-  let maxAdvR = 0;
-  const finalIndex = Math.min(m3.length - 1, signalIndex + config.maxHoldBars);
-
-  for (let i = signalIndex + 1; i <= finalIndex; i++) {
-    const candle = m3[i];
-    exitIndex = i;
-    exitTime = candle.time;
-
-    const fav = setup.direction === "long"
-      ? (candle.high - entry) / risk
-      : (entry - candle.low) / risk;
-    const adv = setup.direction === "long"
-      ? (entry - candle.low) / risk
-      : (candle.high - entry) / risk;
-    maxFavR = Math.max(maxFavR, fav);
-    maxAdvR = Math.max(maxAdvR, adv);
-
-    const stopHit = setup.direction === "long"
-      ? candle.low <= activeStop
-      : candle.high >= activeStop;
-
-    if (stopHit) {
-      const stopR = setup.direction === "long"
-        ? (activeStop - entry) / risk
-        : (entry - activeStop) / risk;
-      realizedR += stopR * remaining;
-      exitPrice = activeStop;
-      exitReason = activeStop === entry ? "breakeven_stop" : "stop";
-      remaining = 0;
-      break;
-    }
-
-    for (const partial of partials) {
-      if (partial.hit) continue;
-      const hit = setup.direction === "long"
-        ? candle.high >= partial.price
-        : candle.low <= partial.price;
-      if (hit) {
-        partial.hit = true;
-        realizedR += partial.r * partial.size;
-        remaining -= partial.size;
-        exitPrice = partial.price;
-        exitReason = `target_${partial.r}r`;
-        if (partial.r === 1) activeStop = entry;
-      }
-    }
-
-    if (remaining <= 0.0001) { remaining = 0; break; }
-  }
-
-  if (remaining > 0) {
-    const last = m3[exitIndex];
-    const openR = setup.direction === "long"
-      ? (last.close - entry) / risk
-      : (entry - last.close) / risk;
-    realizedR += openR * remaining;
-    exitPrice = last.close;
-  }
-
-  return {
-    direction: setup.direction,
-    poolType: setup.poolType,
-    poolId: setup.poolId,
-    dailyBias: setup.dailyBias,
-    score: setup.score,
-    grade: setup.grade,
-    reasons: setup.reasons ?? [],
-    signalIndex,
-    entryIndex: signalIndex,
-    exitIndex,
-    signalTime: entryCandle.time,
-    entryTime: entryCandle.time,
-    exitTime,
-    entry,
-    stop,
-    exitPrice,
-    exitReason,
-    risk,
-    initialRR: setup.initialRR ?? 0,
-    maxFavorableExcursionR: round(maxFavR, 2),
-    maxAdverseExcursionR: round(maxAdvR, 2),
-    rMultiple: round(realizedR, 3),
-    partials: partials.map(({ r, size, price, hit }) => ({ r, size, price, hit }))
-  };
-}
-
-// ─── Metrics ──────────────────────────────────────────────────────────────────
-
-function calculateMetrics(trades) {
-  const wins = trades.filter(t => t.rMultiple > 0);
-  const losses = trades.filter(t => t.rMultiple < 0);
-  const grossWin = wins.reduce((s, t) => s + t.rMultiple, 0);
-  const grossLoss = Math.abs(losses.reduce((s, t) => s + t.rMultiple, 0));
-  const totalR = trades.reduce((s, t) => s + t.rMultiple, 0);
-  const avgScore = trades.length
-    ? trades.reduce((s, t) => s + t.score, 0) / trades.length
-    : 0;
-  const equity = buildEquityCurve(trades);
-
-  return {
-    trades: trades.length,
-    wins: wins.length,
-    losses: losses.length,
-    winRate: trades.length ? round((wins.length / trades.length) * 100, 1) : 0,
-    profitFactor: grossLoss ? round(grossWin / grossLoss, 2) : round(grossWin, 2),
-    totalR: round(totalR, 2),
-    averageR: trades.length ? round(totalR / trades.length, 2) : 0,
-    averageScore: round(avgScore, 1),
-    maxDrawdownR: round(maxDrawdown(equity), 2)
-  };
-}
-
-function buildEquityCurve(trades) {
-  let equity = 0;
-  return trades.map(t => {
-    equity += t.rMultiple;
-    return { time: t.exitTime, value: round(equity, 3) };
+  const result = simulateTrade(m3, {
+    direction:           setup.direction,
+    entryIndex:          signalIndex + 1,
+    entry:               entryCandle.close,
+    stop:                setup.stop,
+    partials:            config.partials,
+    moveStopToBEAfterTP: 1,
+    maxHoldBars:         config.maxHoldBars
   });
+  if (!result) return null;
+
+  return {
+    ...result,
+    entryIndex: signalIndex,
+    entryTime:  entryCandle.time,
+    signalIndex,
+    signalTime: entryCandle.time,
+    stop:       setup.stop,
+    poolType:   setup.poolType,
+    poolId:     setup.poolId,
+    dailyBias:  setup.dailyBias,
+    score:      setup.score,
+    grade:      setup.grade,
+    reasons:    setup.reasons ?? [],
+    initialRR:  setup.initialRR ?? 0
+  };
 }
 
-function maxDrawdown(equityCurve) {
-  let peak = 0;
-  let worst = 0;
-  for (const pt of equityCurve) {
-    peak = Math.max(peak, pt.value);
-    worst = Math.min(worst, pt.value - peak);
-  }
-  return Math.abs(worst);
-}
 
 function poolToLevel(pool) {
   return {

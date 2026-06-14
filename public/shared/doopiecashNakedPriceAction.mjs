@@ -1,3 +1,5 @@
+import { simulateTrade, calculateMetrics, buildEquityCurve } from "./tradeSimulator.mjs";
+
 const DEFAULT_OPTIONS = {
   levelTolerancePct: 0.35,
   swingWindow: 3,
@@ -216,116 +218,40 @@ function pickBestSetup(longCandidate, shortCandidate, config) {
 
 function playTrade(m3, signalIndex, setup, context, config) {
   const entryCandle = m3[signalIndex];
-  const entry = entryCandle.close;
-  const stop = setup.stop.price;
-  const risk = Math.abs(entry - stop);
-  if (!Number.isFinite(risk) || risk <= 0) return null;
+  if (!entryCandle || !m3[signalIndex + 1]) return null;
 
-  const partials = config.partials.map((partial) => ({
-    ...partial,
-    hit: false,
-    price: setup.direction === "long" ? entry + risk * partial.r : entry - risk * partial.r
-  }));
-
-  let realizedR = 0;
-  let remaining = 1;
-  let activeStop = stop;
-  let exitIndex = signalIndex;
-  let exitTime = entryCandle.time;
-  let exitPrice = entry;
-  let exitReason = "time_exit";
-  let maxFavorableExcursionR = 0;
-  let maxAdverseExcursionR = 0;
-  const finalIndex = Math.min(m3.length - 1, signalIndex + config.maxHoldBars);
-
-  for (let i = signalIndex + 1; i <= finalIndex; i += 1) {
-    const candle = m3[i];
-    exitIndex = i;
-    exitTime = candle.time;
-
-    const favorable =
-      setup.direction === "long" ? (candle.high - entry) / risk : (entry - candle.low) / risk;
-    const adverse =
-      setup.direction === "long" ? (entry - candle.low) / risk : (candle.high - entry) / risk;
-    maxFavorableExcursionR = Math.max(maxFavorableExcursionR, favorable);
-    maxAdverseExcursionR = Math.max(maxAdverseExcursionR, adverse);
-
-    const stopHit =
-      setup.direction === "long" ? candle.low <= activeStop : candle.high >= activeStop;
-
-    if (stopHit) {
-      const stopR = setup.direction === "long" ? (activeStop - entry) / risk : (entry - activeStop) / risk;
-      realizedR += stopR * remaining;
-      exitPrice = activeStop;
-      exitReason = activeStop === entry ? "breakeven_stop" : "stop";
-      remaining = 0;
-      break;
-    }
-
-    for (const partial of partials) {
-      if (partial.hit) continue;
-      const targetHit =
-        setup.direction === "long"
-          ? candle.high >= partial.price
-          : candle.low <= partial.price;
-
-      if (targetHit) {
-        partial.hit = true;
-        realizedR += partial.r * partial.size;
-        remaining -= partial.size;
-        exitPrice = partial.price;
-        exitReason = `target_${partial.r}r`;
-
-        if (partial.r === 1) {
-          activeStop = entry;
-        }
-      }
-    }
-
-    if (remaining <= 0.0001) {
-      remaining = 0;
-      break;
-    }
-  }
-
-  if (remaining > 0) {
-    const last = m3[exitIndex];
-    const openR =
-      setup.direction === "long" ? (last.close - entry) / risk : (entry - last.close) / risk;
-    realizedR += openR * remaining;
-    exitPrice = last.close;
-  }
+  const result = simulateTrade(m3, {
+    direction:           setup.direction,
+    entryIndex:          signalIndex + 1,  // evaluate from the candle after the signal
+    entry:               entryCandle.close, // entered at close of signal candle
+    stop:                setup.stop.price,
+    partials:            config.partials,
+    moveStopToBEAfterTP: 1,
+    maxHoldBars:         config.maxHoldBars
+  });
+  if (!result) return null;
 
   return {
-    direction: setup.direction,
-    setupName: setup.setupName,
-    score: setup.score,
-    grade: setup.grade,
-    dailyBias: setup.dailyBias,
-    weeklyBias: setup.weeklyBias,
-    h4Setup: setup.setupName,
-    m15Trigger: setup.m15Trigger,
-    entrySignal: setup.entrySignal,
-    reasons: setup.reasons,
-    penalties: setup.penalties,
+    ...result,
+    // Restore signal-candle timing (entry happened at signal close, not next-candle open)
+    entryIndex:    signalIndex,
+    entryTime:     entryCandle.time,
     signalIndex,
-    entryIndex: signalIndex,
-    exitIndex,
-    signalTime: entryCandle.time,
-    entryTime: entryCandle.time,
-    exitTime,
-    entry,
-    stop,
-    stopMode: setup.stop.mode,
+    signalTime:    entryCandle.time,
+    stop:          setup.stop.price,
+    stopMode:      setup.stop.mode,
     stopReference: setup.stop.reference,
-    exitPrice,
-    exitReason,
-    risk,
-    initialRr: round(setup.targetRoom, 2),
-    maxFavorableExcursionR: round(maxFavorableExcursionR, 2),
-    maxAdverseExcursionR: round(maxAdverseExcursionR, 2),
-    rMultiple: round(realizedR, 3),
-    partials: partials.map(({ r, size, price, hit }) => ({ r, size, price, hit }))
+    setupName:     setup.setupName,
+    score:         setup.score,
+    grade:         setup.grade,
+    dailyBias:     setup.dailyBias,
+    weeklyBias:    setup.weeklyBias,
+    h4Setup:       setup.setupName,
+    m15Trigger:    setup.m15Trigger,
+    entrySignal:   setup.entrySignal,
+    reasons:       setup.reasons,
+    penalties:     setup.penalties,
+    initialRr:     round(setup.targetRoom, 2)
   };
 }
 
@@ -588,50 +514,6 @@ function zoneToLevel(zone) {
   };
 }
 
-function calculateMetrics(trades) {
-  const wins = trades.filter((trade) => trade.rMultiple > 0);
-  const losses = trades.filter((trade) => trade.rMultiple < 0);
-  const grossWin = wins.reduce((sum, trade) => sum + trade.rMultiple, 0);
-  const grossLoss = Math.abs(losses.reduce((sum, trade) => sum + trade.rMultiple, 0));
-  const totalR = trades.reduce((sum, trade) => sum + trade.rMultiple, 0);
-  const averageScore = trades.length
-    ? trades.reduce((sum, trade) => sum + trade.score, 0) / trades.length
-    : 0;
-  const equity = buildEquityCurve(trades);
-
-  return {
-    trades: trades.length,
-    wins: wins.length,
-    losses: losses.length,
-    winRate: trades.length ? round((wins.length / trades.length) * 100, 1) : 0,
-    profitFactor: grossLoss ? round(grossWin / grossLoss, 2) : round(grossWin, 2),
-    totalR: round(totalR, 2),
-    averageR: trades.length ? round(totalR / trades.length, 2) : 0,
-    averageScore: round(averageScore, 1),
-    maxDrawdownR: round(maxDrawdown(equity), 2)
-  };
-}
-
-function buildEquityCurve(trades) {
-  let equity = 0;
-  return trades.map((trade) => {
-    equity += trade.rMultiple;
-    return {
-      time: trade.exitTime,
-      value: round(equity, 3)
-    };
-  });
-}
-
-function maxDrawdown(equityCurve) {
-  let peak = 0;
-  let worst = 0;
-  for (const point of equityCurve) {
-    peak = Math.max(peak, point.value);
-    worst = Math.min(worst, point.value - peak);
-  }
-  return Math.abs(worst);
-}
 
 function findCandleIndexAtOrBefore(candles, time) {
   let low = 0;
