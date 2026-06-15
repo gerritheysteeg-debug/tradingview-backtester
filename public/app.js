@@ -51,9 +51,60 @@ const regimeBiasEl = document.querySelector("#regime-bias");
 const regimeRiskEl = document.querySelector("#regime-risk");
 const regimeRecEl = document.querySelector("#regime-rec");
 const regimeRouterBodyEl = document.querySelector("#regime-router-body");
-const regimeTimeEl = document.querySelector("#regime-time");
+const regimeTimeEl = document.querySelector("#regime-time, .regime-updated-label");
+const regimeSignalsEl = document.querySelector("#regime-signals");
+const regimeAddAlertEl = document.querySelector("#regime-add-alert");
+
+const scannerCheckEl = document.querySelector("#scanner-check");
+const scannerSectionEl = document.querySelector("#scanner-section");
+const scannerCloseEl = document.querySelector("#scanner-close");
+const scannerChipsEl = document.querySelector("#scanner-chips");
+const scannerAddInputEl = document.querySelector("#scanner-add-input");
+const scannerAddBtnEl = document.querySelector("#scanner-add-btn");
+const scannerResultsEl = document.querySelector("#scanner-results");
+const runScannerEl = document.querySelector("#run-scanner");
+
+const alertsCheckEl = document.querySelector("#alerts-check");
+const alertsSectionEl = document.querySelector("#alerts-section");
+const alertsCloseEl = document.querySelector("#alerts-close");
+const alertsListEl = document.querySelector("#alerts-list");
+const alertInstrumentSelEl = document.querySelector("#alert-instrument-sel");
+const alertConditionSelEl = document.querySelector("#alert-condition-sel");
+const addAlertBtnEl = document.querySelector("#add-alert-btn");
+const alertsHintEl = document.querySelector("#alerts-hint");
+
+const dataQualityRowEl = document.querySelector("#data-quality-row");
+
+const tradeDetailPanelEl = document.querySelector("#trade-detail-panel");
+const tradeDetailTitleEl = document.querySelector("#trade-detail-title");
+const tradeDetailContentEl = document.querySelector("#trade-detail-content");
+const tradeDetailCloseEl = document.querySelector("#trade-detail-close");
+
+const presetCompareSectionEl = document.querySelector("#preset-compare-section");
+const presetCompareCheckboxesEl = document.querySelector("#preset-compare-checkboxes");
+const presetCompareResultsEl = document.querySelector("#preset-compare-results");
+const runCompareEl = document.querySelector("#run-compare");
+const presetCompareCloseEl = document.querySelector("#preset-compare-close");
+const comparePresetsEl = document.querySelector("#compare-presets");
+
+const exportRapportEl = document.querySelector("#export-rapport");
+const optimizeCheckEl = document.querySelector("#optimize-check");
+const optimizeSectionEl = document.querySelector("#optimize-section");
+const optimizeCloseEl = document.querySelector("#optimize-close");
+const optimizeParamGridEl = document.querySelector("#optimize-param-grid");
+const optimizeComboCountEl = document.querySelector("#optimize-combo-count");
+const runOptimizeEl = document.querySelector("#run-optimize");
+const optimizeResultsEl = document.querySelector("#optimize-results");
 
 const PRESET_STORAGE_KEY = "tradingResearch.presets.v1";
+
+const PREFERRED_CURRENCIES = ["BTC", "ETH", "PAXG", "BNB", "SOL"];
+let _allCurrencies = [];
+let _showAllCurrencies = false;
+
+const currencyToggleEl = document.querySelector("#currency-toggle");
+
+let lastBacktestResult = null;
 
 let chart;
 let candleSeries;
@@ -199,16 +250,29 @@ async function postJson(url, body) {
 async function loadCurrencies() {
   try {
     const { currencies } = await getJson("/api/currencies");
-    currencyEl.innerHTML = currencies
-      .map(
-        (currency) =>
-          `<option value="${currency.code}">${currency.code} · ${currency.name}</option>`
-      )
-      .join("");
-    setSelectValue(currencyEl, "BTC");
+    _allCurrencies = currencies;
+    renderCurrencyOptions();
   } catch (error) {
     console.error(error);
     setStatus("Currencies konden niet worden geladen");
+  }
+}
+
+function renderCurrencyOptions() {
+  const prev = currencyEl.value;
+  const visible = _showAllCurrencies
+    ? _allCurrencies
+    : _allCurrencies.filter(c => PREFERRED_CURRENCIES.includes(c.code));
+  const list = visible.length ? visible : _allCurrencies;
+
+  currencyEl.innerHTML = list
+    .map(c => `<option value="${c.code}">${c.code} · ${c.name}</option>`)
+    .join("");
+  setSelectValue(currencyEl, PREFERRED_CURRENCIES.includes(prev) || _showAllCurrencies ? prev : "BTC");
+
+  if (currencyToggleEl) {
+    currencyToggleEl.textContent = _showAllCurrencies ? "− Minder valuta's" : "+ Meer valuta's";
+    currencyToggleEl.classList.toggle("active", _showAllCurrencies);
   }
 }
 
@@ -388,6 +452,385 @@ function resetFocus() {
   chart?.timeScale().fitContent();
 }
 
+// ─── Trade detail panel ───────────────────────────────────────────────────────
+
+function openTradeDetail(trade) {
+  if (!tradeDetailPanelEl) return;
+  const dir = trade.direction === "long" ? "▲ LONG" : "▼ SHORT";
+  const gradeClass = (trade.rMultiple ?? 0) >= 0 ? "positive" : "negative";
+
+  const rows = [
+    ["Richting",    `<strong>${dir}</strong>`],
+    ["Entry",       formatPrice(trade.entry)],
+    ["Stop",        formatPrice(trade.stop)],
+    ["Stop type",   formatStopMode(trade.stopMode)],
+    ["Exit",        formatPrice(trade.exitPrice)],
+    ["Reden exit",  trade.exitReason ?? "—"],
+    ["Score",       trade.score ?? "—"],
+    ["Grade",       trade.grade ?? "—"],
+    ["R (bruto)",   trade.grossR != null ? `${trade.grossR}R` : "—"],
+    ["Kosten R",    trade.costR  != null ? `−${trade.costR}R`  : "—"],
+    ["Funding R",   trade.fundingR != null && trade.fundingR !== 0 ? `−${trade.fundingR}R` : "—"],
+    ["R (netto)",   `<span class="${gradeClass}">${trade.rMultiple}R</span>`],
+    ["MFE",         trade.mfeR != null ? `${trade.mfeR}R max gunstig` : "—"],
+    ["MAE",         trade.maeR != null ? `${trade.maeR}R max ongunstig` : "—"],
+    ["Bars",        trade.barsHeld != null ? `${trade.barsHeld} bars` : "—"],
+    ["Bias",        trade.dailyBias ?? trade.monthlyBias ?? "—"]
+  ].filter(([, v]) => v !== "—");
+
+  if (trade.description) {
+    rows.push(["Setup uitleg", `<span style="white-space:normal;color:var(--muted);font-size:12px;">${escapeHtml(trade.description)}</span>`]);
+  }
+  if (trade.reasons?.length) {
+    rows.push(["Redenen", escapeHtml(trade.reasons.join(" · "))]);
+  }
+  if (trade.penalties?.length) {
+    rows.push(["Penalties", `<span style="color:var(--danger)">${escapeHtml(trade.penalties.join(" · "))}</span>`]);
+  }
+
+  const id = trade.id ?? "?";
+  tradeDetailTitleEl.textContent = `Trade #${id} · ${dir}`;
+  tradeDetailContentEl.innerHTML = `
+    <dl class="trade-detail-grid">
+      ${rows.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${v}</dd>`).join("")}
+    </dl>
+  `;
+  tradeDetailPanelEl.classList.remove("hidden");
+}
+
+function closeTradeDetail() {
+  tradeDetailPanelEl?.classList.add("hidden");
+}
+
+// ─── Data quality ────────────────────────────────────────────────────────────
+
+function computeDataQuality(entryCandles, levelCandles, entryResolution, levelResolution, lookbackDays) {
+  const nowSec = Date.now() / 1000;
+  const checks = [];
+  const tfData = [
+    { label: entryResolution, candles: entryCandles },
+    { label: levelResolution, candles: levelCandles }
+  ];
+  for (const { label, candles } of tfData) {
+    if (!Array.isArray(candles) || !label) continue;
+    const count = candles.length;
+    const lastTime = candles.at(-1)?.time ?? 0;
+    const ageHours = lastTime ? Math.round((nowSec - lastTime) / 3600) : null;
+    const ok = count >= 5 && (ageHours === null || ageHours < 24);
+    checks.push({ label, count, ageHours, ok });
+  }
+  return checks;
+}
+
+function renderDataQuality(checks) {
+  if (!dataQualityRowEl || !checks.length) return;
+  dataQualityRowEl.classList.remove("hidden");
+  dataQualityRowEl.innerHTML = checks.map(c => {
+    const cls = c.ok ? "dq-pill ok" : "dq-pill warn";
+    const age = c.ageHours != null ? ` · ${c.ageHours}u oud` : "";
+    return `<span class="${cls}" title="${c.label}: ${c.count} candles${age}">${c.label} ${c.count}${c.ok ? "" : " ⚠"}</span>`;
+  }).join("");
+}
+
+// ─── Multi-instrument scanner ─────────────────────────────────────────────────
+
+const SCANNER_KEY = "tradingResearch.scannerInstruments.v1";
+const DEFAULT_SCANNER = ["BTC-PERPETUAL", "ETH-PERPETUAL", "SOL-PERPETUAL"];
+
+let _lastRegimeResult = null;
+
+function getScannerInstruments() {
+  try { return JSON.parse(localStorage.getItem(SCANNER_KEY) ?? "null") ?? DEFAULT_SCANNER; } catch { return DEFAULT_SCANNER; }
+}
+function setScannerInstruments(list) {
+  localStorage.setItem(SCANNER_KEY, JSON.stringify(list));
+}
+
+function renderScannerChips() {
+  const list = getScannerInstruments();
+  scannerChipsEl.innerHTML = list.map(name => `
+    <span class="scanner-chip">
+      ${escapeHtml(name)}
+      <button class="scanner-chip-remove" data-name="${escapeHtml(name)}" type="button" title="Verwijder">×</button>
+    </span>
+  `).join("");
+  scannerChipsEl.querySelectorAll(".scanner-chip-remove").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const updated = getScannerInstruments().filter(n => n !== btn.dataset.name);
+      setScannerInstruments(updated);
+      renderScannerChips();
+    });
+  });
+}
+
+async function runScanner() {
+  scannerResultsEl.innerHTML = `<p class="scanner-hint">Scannen…</p>`;
+  const instruments = getScannerInstruments();
+  const results = await Promise.allSettled(instruments.map(async name => {
+    const params = new URLSearchParams({ instrument: name, lookbackDays: 90 });
+    const data = await getJson(`/api/regime-decision?${params}`);
+    return { instrumentName: name, ...data };
+  }));
+
+  const rows = results.map((r, i) => ({
+    instrumentName: instruments[i],
+    ok: r.status === "fulfilled",
+    error: r.status === "rejected" ? (r.reason?.message ?? "fout") : null,
+    ...(r.status === "fulfilled" ? r.value : {})
+  }));
+
+  rows.sort((a, b) => {
+    if (!a.ok && b.ok) return 1;
+    if (a.ok && !b.ok) return -1;
+    const aScore = (a.recommendedStrategyId ? 1 : 0) * 200 + (a.confidence ?? 0);
+    const bScore = (b.recommendedStrategyId ? 1 : 0) * 200 + (b.confidence ?? 0);
+    return bScore - aScore;
+  });
+
+  if (!rows.length) { scannerResultsEl.innerHTML = `<p class="scanner-hint">Geen instrumenten geconfigureerd.</p>`; return; }
+
+  scannerResultsEl.innerHTML = `
+    <table class="scanner-table">
+      <thead><tr><th>Instrument</th><th>Regime</th><th>Conf.</th><th>Bias</th><th>Aanbeveling</th><th>MTF</th></tr></thead>
+      <tbody>
+        ${rows.map(r => {
+          if (!r.ok) return `<tr><td>${escapeHtml(r.instrumentName)}</td><td colspan="5" class="negative">${escapeHtml(r.error)}</td></tr>`;
+          const color = REGIME_COLORS[r.regime] ?? "#555";
+          const reliCls = r.isReliable ? "positive" : (r.confidence >= 55 ? "" : "negative");
+          const rec = r.recommendedStrategyId
+            ? (r.strategyRouter?.find(s => s.strategyId === r.recommendedStrategyId)?.name ?? r.recommendedStrategyId)
+            : (r.regime === "chop" ? "geen trade" : "—");
+          const bias = r.bias === "long" ? "↑ Bull" : r.bias === "short" ? "↓ Bear" : "→";
+          const mtf = r.confluence?.score != null ? `${r.confluence.score}%` : "—";
+          return `
+            <tr class="scanner-row" data-instrument="${escapeHtml(r.instrumentName)}" style="cursor:pointer" title="Klik om te laden">
+              <td><strong>${escapeHtml(r.instrumentName)}</strong></td>
+              <td style="color:${color};font-weight:700">${escapeHtml(r.regimeLabel ?? r.regime ?? "—")}</td>
+              <td class="${reliCls}">${r.confidence ?? 0}%</td>
+              <td>${bias}</td>
+              <td>${escapeHtml(rec)}</td>
+              <td>${mtf}</td>
+            </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+  `;
+
+  scannerResultsEl.querySelectorAll(".scanner-row").forEach(row => {
+    row.addEventListener("click", () => {
+      const name = row.dataset.instrument;
+      const instrEl = document.querySelector("#instrument");
+      if (instrEl) {
+        setSelectValue(instrEl, name);
+        runBacktest();
+        scannerSectionEl.classList.add("hidden");
+      }
+    });
+  });
+}
+
+// ─── Alerts & watchlist ───────────────────────────────────────────────────────
+
+const ALERTS_KEY = "tradingResearch.alerts.v2";
+let _alertTimer = null;
+
+const ALERT_CONDITION_LABELS = {
+  regime_reliable: "Regime betrouwbaar (≥ 70%)",
+  setup_ready:     "Setup actief voor huidige strategie"
+};
+
+function readAlerts() {
+  try { return JSON.parse(localStorage.getItem(ALERTS_KEY) ?? "[]"); } catch { return []; }
+}
+function writeAlerts(list) { localStorage.setItem(ALERTS_KEY, JSON.stringify(list)); }
+
+function renderAlertsList() {
+  const alerts = readAlerts();
+  if (!alerts.length) {
+    alertsListEl.innerHTML = `<p class="alerts-hint">Geen actieve alerts.</p>`;
+    alertsCheckEl.classList.remove("alerts-active");
+    return;
+  }
+  alertsListEl.innerHTML = alerts.map(a => `
+    <div class="alert-item ${a.triggered ? "alert-triggered" : ""}">
+      <div class="alert-item-info">
+        <strong>${escapeHtml(a.instrumentName)}</strong>
+        <span>${escapeHtml(ALERT_CONDITION_LABELS[a.condition] ?? a.condition)}</span>
+        ${a.triggeredAt ? `<span class="alert-time">Getriggerd: ${new Date(a.triggeredAt).toLocaleTimeString("nl-NL")}</span>` : ""}
+      </div>
+      <button class="icon-button alert-remove-btn" data-id="${escapeHtml(a.id)}" type="button" title="Verwijder alert">×</button>
+    </div>
+  `).join("");
+  alertsListEl.querySelectorAll(".alert-remove-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      writeAlerts(readAlerts().filter(a => a.id !== btn.dataset.id));
+      renderAlertsList();
+    });
+  });
+  alertsCheckEl.classList.toggle("alerts-active", alerts.some(a => a.triggered));
+}
+
+function addAlert(instrumentName, condition) {
+  const alerts = readAlerts();
+  const existing = alerts.find(a => a.instrumentName === instrumentName && a.condition === condition);
+  if (existing) { showToast(`Alert bestaat al: ${instrumentName}`); return; }
+  alerts.push({ id: `alert-${Date.now()}`, instrumentName, condition, triggered: false, triggeredAt: null });
+  writeAlerts(alerts);
+  renderAlertsList();
+  showToast(`Alert ingesteld: ${instrumentName}`);
+  startAlertPolling();
+}
+
+async function checkAlerts() {
+  const alerts = readAlerts();
+  if (!alerts.length) return;
+  let changed = false;
+  await Promise.allSettled(alerts.map(async a => {
+    if (a.triggered) return;
+    try {
+      let triggered = false;
+      if (a.condition === "regime_reliable") {
+        const params = new URLSearchParams({ instrument: a.instrumentName, lookbackDays: 90 });
+        const data = await getJson(`/api/regime-decision?${params}`);
+        triggered = data.isReliable === true;
+      } else if (a.condition === "setup_ready") {
+        const strategy = strategyEl.value ?? "support-resistance-v1";
+        const params = new URLSearchParams({ instrument: a.instrumentName, strategy, lookbackDays: 90 });
+        const data = await getJson(`/api/next-entry?${params}`);
+        triggered = (data.setups ?? []).some(s => s.status === "ready");
+      }
+      if (triggered) {
+        a.triggered = true;
+        a.triggeredAt = Date.now();
+        changed = true;
+        fireNotification(a);
+      }
+    } catch {}
+  }));
+  if (changed) { writeAlerts(alerts); renderAlertsList(); }
+}
+
+function fireNotification(alert) {
+  const label = ALERT_CONDITION_LABELS[alert.condition] ?? alert.condition;
+  const body = `${alert.instrumentName}: ${label}`;
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification("Trading alert", { body, icon: "/favicon.ico" });
+  }
+  showToast(`🔔 Alert: ${body}`);
+}
+
+function startAlertPolling() {
+  clearInterval(_alertTimer);
+  if (readAlerts().length > 0) {
+    _alertTimer = setInterval(checkAlerts, 60_000);
+  }
+}
+
+function populateAlertInstrumentSel() {
+  const instruments = getScannerInstruments();
+  const current = document.querySelector("#instrument")?.value;
+  const all = current && !instruments.includes(current) ? [current, ...instruments] : instruments;
+  alertInstrumentSelEl.innerHTML = all.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  if (current) setSelectValue(alertInstrumentSelEl, current);
+}
+
+// ─── Preset comparison ────────────────────────────────────────────────────────
+
+function openPresetCompare() {
+  const presets = readPresets();
+  if (presets.length === 0) {
+    showToast("Sla eerst presets op om te vergelijken.");
+    return;
+  }
+  presetCompareSectionEl?.classList.remove("hidden");
+
+  presetCompareCheckboxesEl.innerHTML = presets.map(p => `
+    <label class="preset-compare-check">
+      <input type="checkbox" value="${escapeHtml(p.id)}" name="compare-preset">
+      ${escapeHtml(p.name)}
+    </label>
+  `).join("");
+  presetCompareResultsEl.innerHTML = "";
+}
+
+async function runPresetComparison() {
+  const checked = [...presetCompareCheckboxesEl.querySelectorAll("input[name=compare-preset]:checked")];
+  if (checked.length < 2) {
+    showToast("Selecteer minimaal 2 presets om te vergelijken.");
+    return;
+  }
+  const allPresets = readPresets();
+  const selected = checked.map(cb => allPresets.find(p => p.id === cb.value)).filter(Boolean);
+  const instrument = document.querySelector("#instrument")?.value ?? "BTC-PERPETUAL";
+
+  presetCompareResultsEl.innerHTML = `<p style="color:var(--muted);font-size:13px;">Vergelijking laden…</p>`;
+
+  const results = await Promise.allSettled(selected.map(async preset => {
+    const v = preset.values;
+    const options = {
+      direction: v.direction ?? "both",
+      stopMode: v.stopMode ?? "swing",
+      volumeMultiplier: Number(v.volumeMultiplier ?? 1.5),
+      levelTolerancePct: Number(v.levelTolerancePct ?? 0.5),
+      maxLevelAgeDays: Number(v.maxLevelAgeDays ?? 0),
+      minimumScoreToTrade: Number(v.minimumScoreToTrade ?? 70),
+      smcMinimumScoreToTrade: Number(v.smcMinimumScoreToTrade ?? 65),
+      entryModel: v.entryModel ?? "balanced",
+      feePct: Number(v.feePct ?? 0.05),
+      slippagePct: Number(v.slippagePct ?? 0.02),
+      fundingRatePct8h: Number(v.fundingRatePct8h ?? 0),
+      intrabarOrder: v.intrabarOrder ?? "pessimistic",
+      outOfSamplePct: Number(v.outOfSamplePct ?? 0)
+    };
+    const resp = await fetch("/api/backtest", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        instrumentName: instrument,
+        strategyId: v.strategyId ?? "support-resistance-v1",
+        lookbackDays: Number(v.lookbackDays ?? 90),
+        options
+      })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    return { preset, metrics: data.metrics, oos: data.oosMetrics ?? null };
+  }));
+
+  const cols = ["Trades", "Winrate", "Profit Factor", "Gross R", "Net R", "Max DD", "OOS R"];
+  const rows = results.map((r, i) => {
+    if (r.status === "rejected") {
+      return `<tr><td colspan="${cols.length + 1}" style="color:var(--danger)">${escapeHtml(selected[i].name)}: fout — ${escapeHtml(r.reason?.message ?? "onbekend")}</td></tr>`;
+    }
+    const m = r.value.metrics;
+    const oos = r.value.oos;
+    return `
+      <tr>
+        <td><strong>${escapeHtml(r.value.preset.name)}</strong></td>
+        <td>${m.trades ?? 0}</td>
+        <td class="${(m.winRate ?? 0) >= 50 ? "positive" : "negative"}">${(m.winRate ?? 0).toFixed(1)}%</td>
+        <td class="${(m.profitFactor ?? 0) >= 1.5 ? "positive" : (m.profitFactor ?? 0) >= 1 ? "" : "negative"}">${(m.profitFactor ?? 0).toFixed(2)}</td>
+        <td>${(m.grossTotalR ?? 0).toFixed(1)}R</td>
+        <td class="${(m.totalR ?? 0) >= 0 ? "positive" : "negative"}">${(m.totalR ?? 0).toFixed(1)}R</td>
+        <td class="${(m.maxDrawdownR ?? 0) >= -3 ? "" : "negative"}">${(m.maxDrawdownR ?? 0).toFixed(1)}R</td>
+        <td class="${oos ? ((oos.totalR ?? 0) >= 0 ? "positive" : "negative") : ""}">${oos ? `${(oos.totalR ?? 0).toFixed(1)}R` : "—"}</td>
+      </tr>
+    `;
+  });
+
+  presetCompareResultsEl.innerHTML = `
+    <table class="preset-compare-table">
+      <thead>
+        <tr>
+          <th>Preset</th>
+          ${cols.map(c => `<th>${c}</th>`).join("")}
+        </tr>
+      </thead>
+      <tbody>${rows.join("")}</tbody>
+    </table>
+  `;
+}
+
 async function loadChartCandles(resolution) {
   if (!chart) return;
   const instrument = instrumentEl.value;
@@ -455,6 +898,7 @@ function renderWalkForward(wf) {
 }
 
 function renderResult(result) {
+  lastBacktestResult = result;
   ensureChart();
   strategyLabelEl.textContent = result.strategyName ?? result.strategy;
   titleEl.textContent =
@@ -497,6 +941,12 @@ function renderResult(result) {
   renderMonthlyBreakdown(result.trades);
   renderCorrelation(result.trades);
   chart.timeScale().fitContent();
+
+  const dqChecks = computeDataQuality(
+    result.entryCandles ?? [], result.levelCandles ?? [],
+    result.entryResolution, result.levelResolution, result.lookbackDays
+  );
+  renderDataQuality(dqChecks);
 }
 
 function renderPriceLines(levels) {
@@ -767,6 +1217,362 @@ function renderCorrelation(trades) {
   `;
 }
 
+// ─── HTML rapport export ──────────────────────────────────────────────────────
+
+function buildEquitySvg(trades, width = 600, height = 120) {
+  if (!trades.length) return "<p style='color:#666'>Geen trades</p>";
+  const sorted = trades.slice().sort((a, b) => a.exitTime - b.exitTime);
+  let cum = 0;
+  const pts = sorted.map(t => { cum = parseFloat((cum + t.rMultiple).toFixed(4)); return cum; });
+  const min = Math.min(0, ...pts);
+  const max = Math.max(0, ...pts);
+  const range = max - min || 1;
+  const pad = 10;
+  const w = width - pad * 2;
+  const h = height - pad * 2;
+  const x = (i) => pad + (i / (pts.length - 1)) * w;
+  const y = (v) => pad + h - ((v - min) / range) * h;
+  const zeroY = y(0);
+  const points = pts.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const color = pts.at(-1) >= 0 ? "#4cc9b0" : "#ff6b6b";
+  return `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:${width}px;height:${height}px">
+    <line x1="${pad}" y1="${zeroY.toFixed(1)}" x2="${width - pad}" y2="${zeroY.toFixed(1)}" stroke="#444" stroke-width="1"/>
+    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2"/>
+    <circle cx="${x(pts.length - 1).toFixed(1)}" cy="${y(pts.at(-1)).toFixed(1)}" r="3" fill="${color}"/>
+  </svg>`;
+}
+
+function buildMonthlyTableRows(trades) {
+  if (!trades.length) return "<tr><td colspan='8' style='color:#666'>Geen trades</td></tr>";
+  const months = new Map();
+  for (const t of trades) {
+    const d = new Date(t.entryTime * 1000);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (!months.has(key)) months.set(key, []);
+    months.get(key).push(t);
+  }
+  return [...months.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([month, mTrades]) => {
+    const wins = mTrades.filter(t => t.rMultiple > 0).length;
+    const totalR = mTrades.reduce((s, t) => s + t.rMultiple, 0);
+    const avgR = totalR / mTrades.length;
+    const best = Math.max(...mTrades.map(t => t.rMultiple));
+    const worst = Math.min(...mTrades.map(t => t.rMultiple));
+    const winPct = ((wins / mTrades.length) * 100).toFixed(0);
+    const [year, mon] = month.split("-");
+    const label = new Date(+year, +mon - 1).toLocaleDateString("nl-NL", { month: "short", year: "numeric" });
+    const rColor = totalR >= 0 ? "#4cc9b0" : "#ff6b6b";
+    return `<tr><td>${label}</td><td>${mTrades.length}</td><td>${wins}</td><td>${winPct}%</td>
+      <td style="color:${rColor}">${totalR.toFixed(2)}R</td>
+      <td style="color:${avgR >= 0 ? "#4cc9b0" : "#ff6b6b"}">${avgR.toFixed(2)}R</td>
+      <td style="color:#4cc9b0">${best.toFixed(2)}R</td>
+      <td style="color:#ff6b6b">${worst.toFixed(2)}R</td></tr>`;
+  }).join("");
+}
+
+function generateHtmlReport(result) {
+  const m = result.metrics ?? {};
+  const wf = result.walkForward;
+  const trades = result.trades ?? [];
+  const sorted = trades.slice().sort((a, b) => b.rMultiple - a.rMultiple);
+  const top10 = sorted.slice(0, 10);
+  const worst10 = sorted.slice(-10).reverse();
+  const now = new Date().toLocaleString("nl-NL");
+
+  const mc = computeMonteCarlo(trades);
+
+  const metricRow = (label, value, color = "") =>
+    `<tr><td>${label}</td><td style="text-align:right;font-weight:600;color:${color}">${value}</td></tr>`;
+
+  const wfSection = wf ? `
+    <h2>Walk-forward validatie</h2>
+    <p>Splitpunt: ${new Date(wf.splitTime * 1000).toLocaleDateString("nl-NL")} · OOS ${wf.oosPct}%</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+      <div>
+        <h3 style="margin:0 0 8px;font-size:13px;color:#aaa">In-sample</h3>
+        <table class="rt">${["trades","winRate","totalR","maxDrawdownR"].filter(k => wf.metricsIS[k] !== undefined).map(k =>
+          metricRow(k, wf.metricsIS[k] + (k === "winRate" ? "%" : "R"), k === "totalR" ? (wf.metricsIS[k] >= 0 ? "#4cc9b0" : "#ff6b6b") : "")
+        ).join("")}</table>
+      </div>
+      <div>
+        <h3 style="margin:0 0 8px;font-size:13px;color:#f2b84b">Out-of-sample</h3>
+        <table class="rt">${["trades","winRate","totalR","maxDrawdownR"].filter(k => wf.metricsOOS[k] !== undefined).map(k =>
+          metricRow(k, wf.metricsOOS[k] + (k === "winRate" ? "%" : "R"), k === "totalR" ? (wf.metricsOOS[k] >= 0 ? "#4cc9b0" : "#ff6b6b") : "")
+        ).join("")}</table>
+      </div>
+    </div>` : "";
+
+  const mcSection = mc ? `
+    <h2>Monte Carlo (1000×)</h2>
+    <table class="rt" style="margin-bottom:24px">
+      ${metricRow("P95 eindstand", "+" + mc.p95End.toFixed(2) + "R", "#4cc9b0")}
+      ${metricRow("P50 eindstand (mediaan)", (mc.p50.at(-1)?.value ?? 0).toFixed(2) + "R")}
+      ${metricRow("P5 max drawdown", "-" + mc.worstDd.toFixed(2) + "R", "#ff6b6b")}
+    </table>` : "";
+
+  const tradeTableRows = (tradeList) => tradeList.map(t => {
+    const color = t.rMultiple >= 0 ? "#4cc9b0" : "#ff6b6b";
+    return `<tr>
+      <td>${t.id ?? "-"}</td>
+      <td>${t.direction}</td>
+      <td>${formatTimestamp(t.entryTime)}</td>
+      <td>${formatPrice(t.entry)}</td>
+      <td>${formatPrice(t.stop)}</td>
+      <td>${formatPrice(t.exitPrice)}</td>
+      <td>${t.score ?? "-"}</td>
+      <td style="color:${color};font-weight:600">${t.rMultiple}R</td>
+    </tr>`;
+  }).join("");
+
+  return `<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Backtest rapport · ${result.instrumentName} · ${now}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #fff; color: #111; padding: 32px; font-size: 14px; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  h2 { font-size: 16px; margin: 28px 0 10px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+  h3 { font-size: 13px; }
+  .meta { color: #666; font-size: 12px; margin-bottom: 24px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .metric-card { border: 1px solid #e5e5e5; border-radius: 8px; padding: 12px 14px; }
+  .metric-card small { display: block; color: #666; font-size: 11px; }
+  .metric-card strong { font-size: 20px; }
+  .positive { color: #0a7a5a; }
+  .negative { color: #cc2222; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+  th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #eee; font-size: 13px; }
+  th { background: #f5f5f5; font-weight: 600; }
+  .rt { width: auto; min-width: 220px; }
+  .rt td:first-child { color: #666; width: 160px; }
+  @media print {
+    body { padding: 16px; }
+    h2 { page-break-before: auto; }
+  }
+</style>
+</head>
+<body>
+<h1>${result.instrumentName} · ${result.strategyName ?? result.strategyId}</h1>
+<p class="meta">Entry: ${result.entryResolution} · Levels: ${result.levelResolution} · ${result.lookbackDays} dagen lookback · Rapport gegenereerd ${now}</p>
+
+<h2>Samenvatting</h2>
+<div class="summary-grid">
+  <div class="metric-card"><small>Trades</small><strong>${m.trades ?? 0}</strong></div>
+  <div class="metric-card"><small>Winrate</small><strong class="${(m.winRate ?? 0) >= 50 ? "positive" : "negative"}">${m.winRate ?? 0}%</strong></div>
+  <div class="metric-card"><small>Profit factor</small><strong class="${(m.profitFactor ?? 0) >= 1.5 ? "positive" : (m.profitFactor ?? 0) >= 1 ? "" : "negative"}">${m.profitFactor ?? 0}</strong></div>
+  <div class="metric-card"><small>Gross R</small><strong>${m.grossTotalR ?? 0}R</strong></div>
+  <div class="metric-card"><small>Net R</small><strong class="${(m.totalR ?? 0) >= 0 ? "positive" : "negative"}">${m.totalR ?? 0}R</strong></div>
+  <div class="metric-card"><small>Avg R</small><strong class="${(m.averageR ?? 0) >= 0 ? "positive" : "negative"}">${m.averageR ?? 0}R</strong></div>
+  <div class="metric-card"><small>Max DD R</small><strong class="${Math.abs(m.maxDrawdownR ?? 0) > 3 ? "negative" : ""}">${m.maxDrawdownR ?? 0}R</strong></div>
+  <div class="metric-card"><small>Kosten R</small><strong class="negative">${m.totalCostR ?? 0}R</strong></div>
+</div>
+
+<h2>Equity curve</h2>
+${buildEquitySvg(trades)}
+
+${wfSection}
+${mcSection}
+
+<h2>Beste 10 trades</h2>
+<table>
+  <thead><tr><th>ID</th><th>Side</th><th>Entry tijd</th><th>Entry</th><th>Stop</th><th>Exit</th><th>Score</th><th>R</th></tr></thead>
+  <tbody>${tradeTableRows(top10)}</tbody>
+</table>
+
+<h2>Slechtste 10 trades</h2>
+<table>
+  <thead><tr><th>ID</th><th>Side</th><th>Entry tijd</th><th>Entry</th><th>Stop</th><th>Exit</th><th>Score</th><th>R</th></tr></thead>
+  <tbody>${tradeTableRows(worst10)}</tbody>
+</table>
+
+<h2>Maandelijks overzicht</h2>
+<table>
+  <thead><tr><th>Maand</th><th>Trades</th><th>Wins</th><th>Win%</th><th>Totaal R</th><th>Avg R</th><th>Best</th><th>Worst</th></tr></thead>
+  <tbody>${buildMonthlyTableRows(trades)}</tbody>
+</table>
+
+<h2>Alle trades (${trades.length})</h2>
+<table>
+  <thead><tr><th>ID</th><th>Side</th><th>Entry tijd</th><th>Entry</th><th>Stop</th><th>Exit</th><th>Score</th><th>R</th></tr></thead>
+  <tbody>${tradeTableRows(trades.slice().sort((a, b) => a.entryTime - b.entryTime))}</tbody>
+</table>
+
+<p style="margin-top:32px;color:#999;font-size:11px">Trading Research Backtester · ${now}</p>
+</body>
+</html>`;
+}
+
+function exportReport() {
+  if (!lastBacktestResult) { showToast("Voer eerst een backtest uit."); return; }
+  const html = generateHtmlReport(lastBacktestResult);
+  const win = window.open("", "_blank");
+  if (!win) { showToast("Pop-up geblokkeerd — sta pop-ups toe."); return; }
+  win.document.write(html);
+  win.document.close();
+}
+
+// ─── Parameter optimalisatie ──────────────────────────────────────────────────
+
+const STRATEGY_PARAM_GRIDS = {
+  "support-resistance-v1": {
+    volumeMultiplier:  { label: "Volume multiplier",  values: [1.0, 1.5, 2.0, 2.5, 3.0] },
+    levelTolerancePct: { label: "Level tolerantie %", values: [0.3, 0.5, 0.8, 1.0] }
+  },
+  "doopiecash-naked-price-action-v1": {
+    minimumScoreToTrade: { label: "Min. score",        values: [60, 65, 70, 75, 80, 85] },
+    volumeMultiplier:    { label: "Volume multiplier", values: [1.0, 1.2, 1.5, 2.0] }
+  },
+  "liquidity-driven-smc-v1": {
+    smcMinimumScoreToTrade: { label: "SMC min. score", values: [55, 60, 65, 70, 75] }
+  },
+  "trend-pullback-v1": {
+    volumeMultiplier:  { label: "Volume multiplier",  values: [1.0, 1.5, 2.0, 2.5] },
+    levelTolerancePct: { label: "Level tolerantie %", values: [0.3, 0.5, 0.8] }
+  },
+  "volatility-expansion-v1": {
+    volumeMultiplier: { label: "Volume multiplier", values: [1.5, 2.0, 2.5, 3.0] }
+  }
+};
+
+function getCheckedOptimizeGrid() {
+  const grid = {};
+  if (!optimizeParamGridEl) return grid;
+  optimizeParamGridEl.querySelectorAll(".opt-param-group").forEach(group => {
+    const param = group.dataset.param;
+    const checked = [...group.querySelectorAll("input[type=checkbox]:checked")].map(cb => Number(cb.value));
+    if (checked.length > 0) grid[param] = checked;
+  });
+  return grid;
+}
+
+function cartesianCount(grid) {
+  return Object.values(grid).reduce((acc, vals) => acc * vals.length, 1);
+}
+
+function updateOptimizeComboCount() {
+  const grid = getCheckedOptimizeGrid();
+  const keys = Object.keys(grid);
+  const count = keys.length === 0 ? 0 : cartesianCount(grid);
+  if (optimizeComboCountEl) {
+    const color = count > 200 ? "var(--danger)" : count > 100 ? "var(--warning)" : "";
+    optimizeComboCountEl.textContent = `Combinaties: ${count}${count > 200 ? " (max 200)" : ""}`;
+    optimizeComboCountEl.style.color = color;
+  }
+}
+
+function renderOptimizeParams(strategyId) {
+  if (!optimizeParamGridEl) return;
+  const paramDefs = STRATEGY_PARAM_GRIDS[strategyId];
+  if (!paramDefs) {
+    optimizeParamGridEl.innerHTML = `<p style="color:var(--muted);font-size:13px">Geen parameteropties beschikbaar voor deze strategie.</p>`;
+    updateOptimizeComboCount();
+    return;
+  }
+  optimizeParamGridEl.innerHTML = Object.entries(paramDefs).map(([param, def]) => `
+    <div class="opt-param-group" data-param="${param}">
+      <div class="opt-param-label">${escapeHtml(def.label)}</div>
+      <div class="opt-param-values">
+        ${def.values.map(v => `
+          <label class="opt-value-check">
+            <input type="checkbox" value="${v}" checked>
+            ${v}
+          </label>
+        `).join("")}
+      </div>
+    </div>
+  `).join("");
+  optimizeParamGridEl.querySelectorAll("input[type=checkbox]").forEach(cb => {
+    cb.addEventListener("change", updateOptimizeComboCount);
+  });
+  updateOptimizeComboCount();
+}
+
+async function runOptimize() {
+  if (!optimizeResultsEl) return;
+  const strategyId = strategyEl.value;
+  const instrument = instrumentEl.value;
+  const lookbackDays = Number(form.elements.lookbackDays.value ?? 90);
+  const paramGrid = getCheckedOptimizeGrid();
+
+  if (!Object.keys(paramGrid).length) {
+    showToast("Selecteer minimaal één parameter om te optimaliseren.");
+    return;
+  }
+  const count = cartesianCount(paramGrid);
+  if (count > 200) {
+    showToast(`Te veel combinaties: ${count}. Verwijder enkele waarden (max 200).`);
+    return;
+  }
+
+  optimizeResultsEl.innerHTML = `<p class="optimize-running">Bezig met ${count} combinaties op ${instrument}…</p>`;
+  if (runOptimizeEl) runOptimizeEl.disabled = true;
+
+  const baseOptions = {
+    direction: form.elements.direction.value ?? "both",
+    stopMode: form.elements.stopMode.value ?? "swing",
+    feePct: Number(form.elements.feePct?.value ?? 0.05),
+    slippagePct: Number(form.elements.slippagePct?.value ?? 0.02),
+    fundingRatePct8h: Number(form.elements.fundingRatePct8h?.value ?? 0),
+    intrabarOrder: form.elements.intrabarOrder?.value ?? "pessimistic"
+  };
+
+  try {
+    const result = await postJson("/api/optimize", {
+      instrumentName: instrument,
+      strategyId,
+      lookbackDays,
+      outOfSamplePct: 20,
+      paramGrid,
+      baseOptions
+    });
+
+    const paramKeys = Object.keys(result.results[0]?.params ?? {});
+    const rows = result.results.map(r => {
+      const isM  = r.isMetrics  ?? {};
+      const oosM = r.oosMetrics ?? {};
+      const ratio = r.ratio;
+      const paramCells = paramKeys.map(k => `<td>${r.params[k] ?? "—"}</td>`).join("");
+      const ratioColor = ratio == null ? "" : ratio >= 80 ? "#4cc9b0" : ratio >= 50 ? "#f2b84b" : "#ff6b6b";
+      return `<tr>
+        ${paramCells}
+        <td>${isM.trades ?? 0}</td>
+        <td class="${(isM.winRate ?? 0) >= 50 ? "positive" : "negative"}">${(isM.winRate ?? 0).toFixed(1)}%</td>
+        <td class="${(isM.totalR ?? 0) >= 0 ? "positive" : "negative"}">${(isM.totalR ?? 0).toFixed(1)}R</td>
+        <td>${oosM ? oosM.trades ?? 0 : "—"}</td>
+        <td class="${oosM ? ((oosM.winRate ?? 0) >= 50 ? "positive" : "negative") : ""}">${oosM ? `${(oosM.winRate ?? 0).toFixed(1)}%` : "—"}</td>
+        <td class="${oosM ? ((oosM.totalR ?? 0) >= 0 ? "positive" : "negative") : ""}">${oosM ? `${(oosM.totalR ?? 0).toFixed(1)}R` : "—"}</td>
+        <td style="color:${ratioColor}">${ratio != null ? `${ratio}%` : "—"}</td>
+      </tr>`;
+    });
+
+    const paramHeaders = paramKeys.map(k => {
+      const stratParams = STRATEGY_PARAM_GRIDS[strategyId] ?? {};
+      return `<th>${escapeHtml(stratParams[k]?.label ?? k)}</th>`;
+    }).join("");
+
+    optimizeResultsEl.innerHTML = `
+      <p class="optimize-meta">${result.totalCombinations} combinaties · ${result.instrumentName} · OOS ${result.oosPct}% · Gesorteerd op OOS R</p>
+      <div class="table-wrap">
+        <table class="optimize-table">
+          <thead>
+            <tr>
+              ${paramHeaders}
+              <th>IS trades</th><th>IS win%</th><th>IS R</th>
+              <th>OOS trades</th><th>OOS win%</th><th>OOS R</th>
+              <th title="OOS R / |IS R| × 100%">IS/OOS</th>
+            </tr>
+          </thead>
+          <tbody>${rows.join("")}</tbody>
+        </table>
+      </div>`;
+  } catch (err) {
+    optimizeResultsEl.innerHTML = `<p class="optimize-error">${escapeHtml(err instanceof Error ? err.message : "Optimalisatie mislukt")}</p>`;
+  } finally {
+    if (runOptimizeEl) runOptimizeEl.disabled = false;
+  }
+}
+
 function exportCsv() {
   if (!lastTrades.length) return;
   const rows = [
@@ -896,6 +1702,21 @@ function renderRegimeDecision(result) {
     regimeRecEl.className = "regime-rec-name negative";
   }
 
+  if (regimeSignalsEl) {
+    const signals = result.regimeSignals ?? [];
+    if (signals.length > 0) {
+      regimeSignalsEl.classList.remove("hidden");
+      regimeSignalsEl.innerHTML = signals.map(s => `
+        <div class="regime-signal-pill signal-${s.type}" title="${escapeHtml(s.interpretation)}">
+          <span class="signal-label">${escapeHtml(s.label)}</span>
+          <span class="signal-value">${escapeHtml(s.value)}</span>
+        </div>
+      `).join("");
+    } else {
+      regimeSignalsEl.classList.add("hidden");
+    }
+  }
+
   regimeRouterBodyEl.innerHTML = (result.strategyRouter ?? []).map(s => `
     <tr>
       <td>${escapeHtml(s.name)}</td>
@@ -904,6 +1725,23 @@ function renderRegimeDecision(result) {
       <td class="regime-reason">${escapeHtml(s.reason)}</td>
     </tr>
   `).join("");
+
+  const regimeConfluenceEl = document.querySelector("#regime-confluence");
+  const confluenceDetailsEl = document.querySelector("#confluence-details");
+  if (result.confluence && regimeConfluenceEl && confluenceDetailsEl) {
+    const { score, dominant, details } = result.confluence;
+    regimeConfluenceEl.classList.remove("hidden");
+    const domLabel = dominant === "long" ? "↑ bullish" : dominant === "short" ? "↓ bearish" : "→ neutraal";
+    const tfsHtml = details.map(d => {
+      const icon = d.bias === "long" ? "↑" : d.bias === "short" ? "↓" : "→";
+      const cls  = d.bias === "long" ? "conf-tf positive" : d.bias === "short" ? "conf-tf negative" : "conf-tf neutral";
+      return `<span class="${cls}" title="${escapeHtml(d.reason ?? d.bias)}">${d.tf} ${icon}</span>`;
+    }).join("");
+    confluenceDetailsEl.innerHTML =
+      `<span class="conf-score">${score}%</span><span class="conf-dominant">${domLabel}</span>${tfsHtml}`;
+  } else if (regimeConfluenceEl) {
+    regimeConfluenceEl.classList.add("hidden");
+  }
 
   regimeTimeEl.textContent = `Bijgewerkt: ${new Date().toLocaleTimeString("nl-NL")}`;
 }
@@ -1050,7 +1888,7 @@ function renderTrades(trades) {
   tradesBodyEl.innerHTML = sortTrades(trades)
     .map(
       (trade) => `
-        <tr data-trade-entry="${trade.entryTime}" class="${focusedTrade?.entryTime === trade.entryTime ? "focused-trade" : ""}">
+        <tr data-trade-entry="${trade.entryTime}" class="${focusedTrade?.entryTime === trade.entryTime ? "focused-trade" : ""}"${trade.description ? ` title="${escapeHtml(trade.description)}"` : ""}>
           <td>${trade.id ?? "-"}</td>
           <td>${trade.direction}</td>
           <td>${formatPrice(trade.entry)}</td>
@@ -1071,8 +1909,10 @@ function renderTrades(trades) {
       if (!trade) return;
       if (focusedTrade?.entryTime === trade.entryTime) {
         resetFocus();
+        closeTradeDetail();
       } else {
         focusTrade(trade);
+        openTradeDetail(trade);
       }
     });
   });
@@ -1241,13 +2081,30 @@ currencyEl.addEventListener("change", () => {
   loadInstruments({ preferredInstrument: "" });
 });
 
+currencyToggleEl?.addEventListener("click", (e) => {
+  e.preventDefault();
+  _showAllCurrencies = !_showAllCurrencies;
+  renderCurrencyOptions();
+});
+
 kindEl.addEventListener("change", () => {
   loadInstruments({ preferredInstrument: "" });
 });
 
-strategyEl.addEventListener("change", updateStrategyOptions);
+strategyEl.addEventListener("change", () => {
+  updateStrategyOptions();
+  if (!optimizeSectionEl?.classList.contains("hidden")) renderOptimizeParams(strategyEl.value);
+});
 
 exportCsvEl.addEventListener("click", exportCsv);
+exportRapportEl?.addEventListener("click", exportReport);
+
+optimizeCheckEl?.addEventListener("click", () => {
+  const isHidden = optimizeSectionEl?.classList.toggle("hidden");
+  if (!isHidden) renderOptimizeParams(strategyEl.value);
+});
+optimizeCloseEl?.addEventListener("click", () => optimizeSectionEl?.classList.add("hidden"));
+runOptimizeEl?.addEventListener("click", runOptimize);
 
 monteCarloEl.addEventListener("click", () => {
   if (lastTrades.length < 3) return;
@@ -1274,6 +2131,56 @@ savePresetEl.addEventListener("click", saveCurrentPreset);
 deletePresetEl.addEventListener("click", deleteSelectedPreset);
 presetSelectEl.addEventListener("change", applySelectedPreset);
 liveRefreshEl.addEventListener("change", configureLiveRefresh);
+
+tradeDetailCloseEl?.addEventListener("click", () => { resetFocus(); closeTradeDetail(); });
+
+comparePresetsEl?.addEventListener("click", (e) => { e.preventDefault(); openPresetCompare(); });
+presetCompareCloseEl?.addEventListener("click", () => presetCompareSectionEl?.classList.add("hidden"));
+runCompareEl?.addEventListener("click", runPresetComparison);
+
+// ─── Scanner ──────────────────────────────────────────────────────────────────
+scannerCheckEl?.addEventListener("click", () => {
+  scannerSectionEl?.classList.toggle("hidden");
+  if (!scannerSectionEl?.classList.contains("hidden")) renderScannerChips();
+});
+scannerCloseEl?.addEventListener("click", () => scannerSectionEl?.classList.add("hidden"));
+scannerAddBtnEl?.addEventListener("click", () => {
+  const name = scannerAddInputEl?.value.trim().toUpperCase();
+  if (!name) return;
+  const list = getScannerInstruments();
+  if (!list.includes(name)) { setScannerInstruments([...list, name]); renderScannerChips(); }
+  if (scannerAddInputEl) scannerAddInputEl.value = "";
+});
+scannerAddInputEl?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") scannerAddBtnEl?.click();
+});
+runScannerEl?.addEventListener("click", runScanner);
+
+// ─── Alerts ───────────────────────────────────────────────────────────────────
+alertsCheckEl?.addEventListener("click", () => {
+  alertsSectionEl?.classList.toggle("hidden");
+  if (!alertsSectionEl?.classList.contains("hidden")) {
+    populateAlertInstrumentSel();
+    renderAlertsList();
+    if (Notification.permission === "default") Notification.requestPermission();
+  }
+});
+alertsCloseEl?.addEventListener("click", () => alertsSectionEl?.classList.add("hidden"));
+addAlertBtnEl?.addEventListener("click", () => {
+  const name = alertInstrumentSelEl?.value;
+  const cond = alertConditionSelEl?.value;
+  if (name && cond) addAlert(name, cond);
+});
+regimeAddAlertEl?.addEventListener("click", () => {
+  const name = document.querySelector("#instrument")?.value ?? "BTC-PERPETUAL";
+  addAlert(name, "regime_reliable");
+  alertsSectionEl?.classList.remove("hidden");
+  populateAlertInstrumentSel();
+  renderAlertsList();
+});
+
+// Start polling for any existing alerts on load
+startAlertPolling();
 
 document.querySelectorAll(".tf-btn[data-resolution]").forEach(btn => {
   btn.addEventListener("click", () => loadChartCandles(btn.dataset.resolution));

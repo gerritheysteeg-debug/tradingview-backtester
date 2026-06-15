@@ -33,6 +33,8 @@ export function toDeribitResolution(resolution) {
   return spec.apiResolution;
 }
 
+const DERIBIT_TIMEOUT_MS = Number(process.env.DERIBIT_TIMEOUT_MS ?? 12_000);
+
 export async function fetchDeribit(path, params = {}) {
   const url = new URL(`${DERIBIT_HTTP_URL}${path}`);
   for (const [key, value] of Object.entries(params)) {
@@ -41,7 +43,17 @@ export async function fetchDeribit(path, params = {}) {
     }
   }
 
-  const response = await fetch(url);
+  const signal = AbortSignal.timeout(DERIBIT_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(url, { signal });
+  } catch (error) {
+    if (error.name === "TimeoutError" || error.name === "AbortError") {
+      throw new Error(`Deribit timeout after ${DERIBIT_TIMEOUT_MS}ms: ${path}`);
+    }
+    throw error;
+  }
+
   if (!response.ok) {
     throw new Error(`Deribit HTTP ${response.status}: ${response.statusText}`);
   }

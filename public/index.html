@@ -45,6 +45,9 @@
               <button id="save-preset" class="secondary-button" type="button">Save</button>
               <button id="delete-preset" class="icon-button" type="button" title="Preset verwijderen">X</button>
             </div>
+            <div class="currency-toggle-row">
+              <a id="compare-presets" href="#" class="currency-toggle-link">≡ Vergelijk presets</a>
+            </div>
           </section>
 
           <div class="field-grid">
@@ -62,6 +65,9 @@
                 <option value="spot">Spot</option>
               </select>
             </label>
+          </div>
+          <div class="currency-toggle-row">
+            <a id="currency-toggle" href="#" class="currency-toggle-link">+ Meer valuta's</a>
           </div>
 
           <label>
@@ -205,6 +211,9 @@
           </div>
           <div class="topbar-actions">
             <button id="monte-carlo" class="icon-button" type="button">Monte Carlo</button>
+            <button id="optimize-check" class="icon-button optimize-btn" type="button">⚙ Optimaliseer</button>
+            <button id="scanner-check" class="icon-button scanner-btn" type="button">⊞ Scanner</button>
+            <button id="alerts-check" class="icon-button alerts-btn" type="button">🔔 Alerts</button>
             <button id="regime-check" class="regime-button" type="button">Welke strategie nu?</button>
             <button id="refresh-advice" class="advice-button" type="button">Advies</button>
             <div id="status" class="status">Klaar</div>
@@ -212,6 +221,7 @@
         </header>
 
         <section class="metrics" id="metrics"></section>
+        <div id="data-quality-row" class="data-quality-row hidden"></div>
 
         <section id="advice-section" class="advice-section hidden">
           <div class="advice-styles">
@@ -264,6 +274,7 @@
               </div>
             </div>
           </div>
+          <div id="regime-signals" class="regime-signals-row hidden"></div>
           <div class="regime-router-wrap">
             <table class="regime-router-table">
               <thead>
@@ -277,7 +288,76 @@
               <tbody id="regime-router-body"></tbody>
             </table>
           </div>
-          <div class="regime-updated"><span id="regime-time"></span></div>
+          <div id="regime-confluence" class="regime-confluence-row hidden">
+            <span class="confluence-label">MTF Confluence</span>
+            <div id="confluence-details" class="confluence-details"></div>
+          </div>
+          <div class="regime-footer">
+            <span id="regime-time" class="regime-updated-label"></span>
+            <button id="regime-add-alert" class="icon-button regime-alert-btn" type="button" title="Alert instellen voor dit instrument">+ Alert</button>
+          </div>
+        </section>
+
+        <section id="preset-compare-section" class="preset-compare-section hidden">
+          <div class="preset-compare-header">
+            <span class="preset-compare-title">Preset vergelijking</span>
+            <button id="preset-compare-close" class="icon-button" type="button">×</button>
+          </div>
+          <div id="preset-compare-body" class="preset-compare-body">
+            <p class="preset-compare-hint">Selecteer 2–3 presets om te vergelijken op het huidige instrument.</p>
+            <div id="preset-compare-checkboxes" class="preset-compare-checkboxes"></div>
+            <button id="run-compare" class="secondary-button preset-compare-run" type="button">Vergelijk</button>
+            <div id="preset-compare-results" class="preset-compare-results"></div>
+          </div>
+        </section>
+
+        <section id="scanner-section" class="scanner-section hidden">
+          <div class="scanner-header">
+            <span class="scanner-title">Multi-instrument scanner</span>
+            <button id="scanner-close" class="icon-button" type="button">×</button>
+          </div>
+          <div class="scanner-instruments">
+            <div id="scanner-chips" class="scanner-chips"></div>
+            <div class="scanner-add-row">
+              <input id="scanner-add-input" class="scanner-add-input" type="text" placeholder="Instrument toevoegen, bijv. ETH-PERPETUAL">
+              <button id="scanner-add-btn" class="icon-button" type="button">+</button>
+            </div>
+          </div>
+          <div id="scanner-results" class="scanner-results">
+            <p class="scanner-hint">Klik <strong>Scan</strong> om alle instrumenten te analyseren op regime en beste strategie.</p>
+          </div>
+          <button id="run-scanner" class="secondary-button scanner-run-btn" type="button">Scan</button>
+        </section>
+
+        <section id="alerts-section" class="alerts-section hidden">
+          <div class="alerts-header">
+            <span class="alerts-title">Alerts &amp; Watchlist</span>
+            <button id="alerts-close" class="icon-button" type="button">×</button>
+          </div>
+          <div id="alerts-list" class="alerts-list"></div>
+          <div class="alerts-add-row">
+            <select id="alert-instrument-sel" class="alert-sel"></select>
+            <select id="alert-condition-sel" class="alert-sel">
+              <option value="regime_reliable">Regime betrouwbaar (≥ 70%)</option>
+              <option value="setup_ready">Setup actief voor huidige strategie</option>
+            </select>
+            <button id="add-alert-btn" class="secondary-button" type="button">+ Alert</button>
+          </div>
+          <p id="alerts-hint" class="alerts-hint"></p>
+        </section>
+
+        <section id="optimize-section" class="optimize-section hidden">
+          <div class="optimize-header">
+            <span class="optimize-title">Parameter optimalisatie</span>
+            <button id="optimize-close" class="icon-button" type="button">×</button>
+          </div>
+          <p class="optimize-hint">Grid search op het huidige instrument en strategie. Elke combinatie wordt gebacktest met 20% OOS split.</p>
+          <div id="optimize-param-grid" class="optimize-param-grid"></div>
+          <div class="optimize-footer">
+            <span id="optimize-combo-count" class="optimize-combo-count">Combinaties: 0</span>
+            <button id="run-optimize" class="secondary-button" type="button">Optimaliseer</button>
+          </div>
+          <div id="optimize-results" class="optimize-results"></div>
         </section>
 
         <section class="chart-section">
@@ -311,6 +391,14 @@
           <div id="mc-stats" class="mc-stats hidden"></div>
         </section>
 
+        <div id="trade-detail-panel" class="trade-detail-panel hidden">
+          <div class="trade-detail-header">
+            <span id="trade-detail-title" class="trade-detail-title">Trade detail</span>
+            <button id="trade-detail-close" class="icon-button trade-detail-close-btn" type="button">×</button>
+          </div>
+          <div id="trade-detail-content" class="trade-detail-content"></div>
+        </div>
+
         <section class="lower-grid">
           <div class="panel">
             <div class="panel-header">
@@ -325,6 +413,7 @@
               <h3>Trades</h3>
               <div class="panel-header-actions">
                 <span id="trade-count">0</span>
+                <button id="export-rapport" class="icon-button" type="button" title="Exporteer als HTML rapport">↗ Rapport</button>
                 <button id="export-csv" class="icon-button" type="button" title="Exporteer als CSV">↓ CSV</button>
               </div>
             </div>

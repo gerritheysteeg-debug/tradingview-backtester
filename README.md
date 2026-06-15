@@ -2,30 +2,63 @@
 
 Lokale dashboard-app voor visueel backtesten, live marktadvies en strategie-onderzoek op crypto-futures. Draait volledig lokaal — geen externe accounts of API-keys nodig.
 
+## Snel starten
+
+Vereist **Node.js 24** of hoger (ESM-modules, geen npm-packages).
+
+```powershell
+npm start
+```
+
+Open daarna `http://localhost:5173` in de browser.
+
+```powershell
+npm test          # 77 unit-tests
+```
+
+---
+
 ## Strategieën
 
 | Strategie | Type | Beschrijving |
 |---|---|---|
-| **Support / Resistance v1** | Reversal / Range | Detecteert HTF support- en resistanceniveaus op basis van touches en volume. Entries op breakout/retest met swing high/low stop. |
-| **Doopiecash Naked Price Action v1** | Price Action | Daily bias → 4H zone-setup → 15m trigger → 3m entry. Scoort elke setup op bias-kwaliteit, zonegrootte en confluentiefactoren. |
-| **Liquidity Driven / SMC-lite v1** | SMC / Liquiditeit | Detecteert buy-side en sell-side liquiditeitspools (equal highs/lows). Wacht op sweep en reclaim voor entry. Multi-timeframe bias via Weekly/Daily/4H. |
-| **Trend Pullback v1** | Continuation | Daily EMA50 + HH-HL/LH-LL swing structuur. Handelt pullbacks naar 4H Higher Lows. Partial exits op TP1/TP2/TP3. |
+| **Support / Resistance v1** | Reversal / Range | Detecteert HTF support- en resistanceniveaus op basis van swing-pivots en touches. Entries op retest met swing high/low stop of level-2 stop. |
+| **Doopiecash Naked Price Action v1** | Price Action | Maandelijkse + daily bias → 4H zone-setup → 15m trigger → 3m sniper-entry. Scoringsmodel (max 130 pts, min 70 voor entry). Wick-fill targets bij rejection-signalen. Setup-uitleg per trade als tooltip. |
+| **Liquidity Driven / SMC-lite v1** | SMC / Liquiditeit | Detecteert buy-side en sell-side liquiditeitspools (equal highs/lows, prev-day/week, range boundaries). Wacht op sweep en reclaim binnen 5 bars, entry op CHOCH/BOS bevestiging. Scoringsmodel min. 65. |
+| **Trend Pullback v1** | Continuation | Daily EMA50 + HH-HL/LH-LL swing-structuur. Handelt pullbacks naar 4H Higher Lows. Partial exits op TP1/TP2/TP3. |
 | **Volatility Expansion v1** | Breakout / Momentum | ATR-percentiel detecteert compressie op 4H. Handelt de bevestigde breakout met volume-expansie. Stop onder/boven retested range boundary. |
-| **Market Regime Engine v1** | Meta-filter | Classificeert het marktregime (trend / range / compressie / expansie / chop / uitputting) en geeft aan welke strategie op dat moment geschikt is. |
 
 Elke strategie heeft een documentatiepagina beschikbaar via de **↗ Meer info** link in de sidebar.
+
+---
 
 ## Functionaliteit
 
 ### Backtester
 
-- **Multi-timeframe candles** van Deribit publieke API (3m, 15m, 4h, 1D, 1W)
+- **Multi-timeframe candles** van Deribit publieke API (3m, 15m, 1h, 4h, 1D, 1W)
 - **Configureerbare parameters**: entry-resolutie, level-resolutie, lookback-periode, volume-multiplier, level-tolerantie, richting (long/short/beide), stop-mode
-- **Strategie-specifieke opties**: min. score, entry model (balanced / conservative / aggressive)
+- **Strategie-specifieke opties**: min. score (Doopiecash), entry model (SMC: balanced / conservative / aggressive)
 - **Equity curve** — cumulatieve R-grafiek gesynchroniseerd met de prijsgrafiek
-- **Chart-legenda** — kleur en lijnstijl per prijslijn (S/R, entry, stop, take profit)
+- **Chart timeframe switcher** — wissel de chart-weergave tussen 3m / 15m / 1h / 4h / 1D
+- **Trade focus** — klik op een trade-rij om in de chart in te zoomen met entry/stop/TP-lijnen
+- **Trade detailpaneel** — klik op een trade voor een volledig paneel: entry/stop/TP, R bruto/netto, kosten, MFE/MAE, exitreden, score, grade, setup-uitleg, redenen en penalties
 - **Maandelijkse breakdown** — wins, win%, totaal R, gemiddeld R, best en worst per maand
+- **Datakwaliteit-paneel** — pill-rij onder metrics na elke backtest: candle-teller + staleness per timeframe
 - **CSV-export** van alle trades
+- **HTML rapport** — "↗ Rapport" genereert een printbare HTML-pagina met equity curve SVG, walk-forward, Monte Carlo, top/worst 10 trades, maandelijks overzicht en volledige tradelijst
+
+### Backtest-realisme opties
+
+Beschikbaar via **Executiekosten & realisme**:
+
+| Optie | Beschrijving |
+|---|---|
+| **Fee %** | Takerkosten per kant (bijv. 0.05% voor Deribit) |
+| **Slippage %** | Spread-slippage per kant |
+| **Funding % per 8u** | Fundingrente voor perpetuals; accumuleert per gestarted 8-uursperiode |
+| **Intrabar candle volgorde** | Pessimistisch (stop wint bij ambiguïteit), Optimistisch (TP wint), Willekeurig (deterministisch per candle via hash) |
+| **Out-of-sample %** | Walk-forward validatie: splits trades tijdlijn in IS (optimalisatie) en OOS (validatie); toont beide metrieken naast elkaar |
 
 ### Monte Carlo simulatie
 
@@ -37,7 +70,7 @@ Schudt de R-waarden van alle trades 1000× door elkaar en berekent drie uitkomst
 
 Toont max drawdown op P5 en eindstand op P95 als samenvattende statistiek.
 
-### Correlatie & streak analyse
+### Correlatie & streak-analyse
 
 Visuele trade-strip met win/loss patroon en vier statistieken:
 
@@ -57,55 +90,117 @@ Voert voor elke handelsstijl tegelijk een scan uit op de actuele marktstructuur 
 
 Per setup: entry-prijs, stop, TP1/TP2/TP3, risk/reward, score en status (**Nu** / **Let op** / **Wacht**). De Day-setup wordt als prijslijnen op de chart getoond.
 
+### Welke strategie nu? (Regime Decision)
+
+De **"Welke strategie nu?"**-knop voert een live marktregime-analyse uit en geeft een concreet advies:
+
+- **Marktregime** met confidence % en betrouwbaarheidslabel (betrouwbaar ≥ 70% / twijfelachtig ≥ 55% / onbetrouwbaar)
+- **Bias** (bullish / bearish / neutraal) en **risico-modifier** (0.75× – 1.1×)
+- **Aanbeveling** — één specifieke strategie als het regime betrouwbaar is
+- **Regime-signalen** — gekleurde pills (ATR%, bull/bear structuurscore, HTF-overlap, EMA-uitlijning, wick-bars) met tooltip per signaal
+- **Routeringstabel** — voor alle 5 strategieën: status (actief / toegestaan / observeer / geblokkeerd / geen trade) + score + reden
+- **MTF Confluence** — percentage 1W/1D/4H-timeframes dat dezelfde richting aangeeft, met per-TF bias-badge
+
+Regimes: Trend · Range · Compressie · Expansie · Chop · Uitputting
+
+### Parameter optimalisatie
+
+De **"⚙ Optimaliseer"**-knop opent een grid search paneel voor de huidige strategie en instrument:
+
+- Per strategie worden de relevante parameters getoond als aanvinkbare waarden (bijv. S/R: volume multiplier × level tolerantie)
+- Live **"Combinaties: X"** teller past zich aan bij iedere wijziging (max 200)
+- Candles worden éénmaal opgehaald; alle combinaties draaien server-side met verplichte 20% OOS split
+- Resultaten gesorteerd op **OOS R** met IS/OOS robustness-ratio per combinatie
+
+### Multi-instrument scanner
+
+De **"⊞ Scanner"**-knop scant meerdere instrumenten tegelijk:
+
+- Configureerbare instrumentenlijst opgeslagen in localStorage (standaard BTC/ETH/SOL-PERPETUAL)
+- Per instrument: regime, confidence %, bias, aanbevolen strategie en MTF confluence-score
+- Klik op een rij om het instrument direct te laden en een backtest te starten
+
+### Alerts & watchlist
+
+De **"🔔 Alerts"**-knop beheert een watchlist met twee condities:
+
+- **Regime betrouwbaar** — trigged wanneer confidence ≥ 70%
+- **Setup actief** — triggered wanneer een setup de status "ready" heeft
+- Polling elke 60 seconden; browser Notification API + toast bij trigger
+- Alert toevoegen vanuit het regime-paneel via "+ Alert"
+
+### Preset vergelijking
+
+**"Vergelijk presets"** link in de sidebar laadt 2–3 opgeslagen presets parallel op hetzelfde instrument en toont een vergelijkingstabel: trades, winrate, profit factor, gross R, net R, max DD en OOS R.
+
 ### Presets
 
 Sla favoriete parameterinstellingen op als preset en laad ze terug via het preset-dropdown.
 
 ### Ondersteunde markten
 
-- **Currencies**: BTC, ETH, SOL, BNB, PAXG en meer (geladen via Deribit API)
+- **Standaard currencies**: BTC, ETH, PAXG, BNB, SOL (beschikbaar op Deribit)
+- **Alle currencies**: klikbaar via "+ Meer valuta's"
 - **Types**: Futures (perpetual en leveraged), Options, Spot
 - **Instruments**: automatisch geladen op basis van geselecteerde currency en type
 
-## Starten
-
-Vereist **Node.js 24** of hoger (ESM-modules, geen npm-packages).
-
-```powershell
-npm start
-```
-
-Open daarna:
-
-```
-http://localhost:5173
-```
-
-## Tests
-
-```powershell
-npm test
-```
+---
 
 ## Architectuur
 
 ```
 server/
-  index.mjs                           # HTTP-server, /api/backtest en /api/next-entry endpoints
+  index.mjs             # HTTP-server; routes: /api/backtest, /api/next-entry,
+                        # /api/regime-decision, /api/optimize, /api/candles,
+                        # /api/instruments, /api/currencies, /api/strategies
+                        # Input-validatie, Promise.allSettled, HTTP-timeout 12s
+                        # cartesianProduct helper voor optimize grid search
+  deribit.mjs           # Deribit API-client; candles, currencies, instruments; AbortSignal timeout
 
 public/
-  app.js                              # Frontend logica (charts, form, Monte Carlo, advice, export)
-  index.html                          # UI shell
-  styles.css                          # Dark-theme styling
-  docs/                               # Strategie documentatiepagina's (HTML)
-  shared/
-    strategyRegistry.mjs              # Strategie-registry (run + scan + docUrl per strategie)
-    supportResistance.mjs             # S/R detectie, backtest en scan
-    doopiecashNakedPriceAction.mjs    # Doopiecash price action, backtest en scan
-    liquidityDrivenSMC.mjs            # SMC/liquiditeit strategie, backtest en scan
-    trendPullback.mjs                 # Trend Pullback, EMA50 + swing zones, backtest en scan
-    volatilityExpansion.mjs           # Volatility Expansion, ATR compressie, backtest en scan
-    marketRegimeEngine.mjs            # Market Regime Engine, regime classificatie en routing
+  app.js                # Frontend: charts, form, Monte Carlo, walk-forward, regime, confluence,
+                        # scanner, alerts, preset-vergelijking, trade-detail, rapport, optimalisatie
+  index.html            # UI shell
+  styles.css            # Dark-theme styling
+  docs/                 # Strategie-documentatiepagina's (HTML)
+
+  shared/               # Gedeelde logica — server én browser importeren via ESM
+    tradeSimulator.mjs            # Kern-engine: simulateTrade, calculateMetrics, buildEquityCurve
+                                  # intrabarOrder, fundingRatePct8h, MAE/MFE, grossR vs netR
+    strategyRegistry.mjs          # Registry: run + scan + walk-forward split per strategie
+    supportResistance.mjs         # S/R pivot-detectie, backtest en scan
+    doopiecashNakedPriceAction.mjs# Price action: daily+maandelijkse bias, 4H setup,
+                                  # 15m trigger, 3m entry, scoringsmodel, wick-fill, beschrijving
+    liquidityDrivenSMC.mjs        # SMC: liquiditeitspools, sweep+reclaim+CHOCH, scoringsmodel
+    trendPullback.mjs             # Trend Pullback: EMA50, swing-zones, backtest en scan
+    volatilityExpansion.mjs       # Volatility Expansion: ATR-compressie, breakout, backtest en scan
+    marketRegimeEngine.mjs        # Regime-classificatie: ATR, swing-structuur, EMA, chop, uitputting
+                                  # Exporteert signals (atrPct, bullScore, bearScore, overlap, wicky, emaAligned)
+    decisionEngine.mjs            # Beslislaag: regime → strategie-routing, risico-modifier
+                                  # buildStrategyRouter, buildDecisionSummary (testbaar export)
+    confluenceScore.mjs           # MTF confluence: bias-overeenstemming 1W/1D/4H → score 0–100
+
+test/
+  tradeSimulator.test.mjs           # 17 tests: stop, TP, BE, MAE/MFE, intrabar, funding
+  supportResistance.test.mjs        # S/R pivot-detectie en level2-stop
+  trendPullback.test.mjs            # Trend Pullback backtest en scan
+  volatilityExpansion.test.mjs      # Volatility Expansion backtest en scan
+  doopiecashNakedPriceAction.test.mjs # Fixture-tests: signal → verwachte trade-velden en score
+  liquidityDrivenSMC.test.mjs       # Fixture-tests: prev_day_low sweep+reclaim+CHOCH → long trade
+  strategyRegistry.test.mjs         # Registry: dispatcher, walk-forward
+  scan.test.mjs                     # Scan edge-cases voor alle strategieën
+  decisionEngine.test.mjs           # 13 tests: strategie-routing per regime, confidence-drempel, chop
 ```
 
-De server en browser delen dezelfde strategie-logica via ESM-modules in `public/shared/`. De server importeert ze rechtstreeks; de browser laadt ze als modules.
+De server en browser delen dezelfde strategie-logica via ESM-modules in `public/shared/`. De server importeert ze rechtstreeks via Node.js; de browser laadt ze als `<script type="module">`.
+
+---
+
+## Ontwerpkeuzes
+
+- **Geen buildstap** — pure ESM, geen bundler, werkt direct in Node 24 en moderne browsers
+- **Geen npm-packages** — nul dependencies; alleen de standaard library en de Deribit publieke REST API
+- **Gedeelde business-logica** — `public/shared/` bevat de strategie-engines die zowel server (backtest-endpoint) als browser (scan) gebruiken
+- **Deterministisch "willekeurig"** — de `random` intrabar-volgorde gebruikt een bitwise hash van de candle-timestamp zodat backtests reproduceerbaar blijven
+- **Promise.allSettled** — een Deribit-fout op één tijdframe laat de rest doorgaan; strategieën ontvangen een lege array voor dat tijdframe
+- **Testbare beslislogica** — `buildStrategyRouter` en `buildDecisionSummary` in `decisionEngine.mjs` zijn pure functies zonder candle-afhankelijkheid, direct te testen zonder fixtures

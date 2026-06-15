@@ -107,13 +107,14 @@ function buildContext(candles, zones, m3Index, config) {
   }
 
   const dailyBias = detectBias(candles.daily, dailyIndex, 18);
+  const weeklyIndex = findCandleIndexAtOrBefore(candles.weekly, signalCandle.time);
   const weeklyBias =
     candles.weekly.length >= 8
-      ? detectBias(
-          candles.weekly,
-          findCandleIndexAtOrBefore(candles.weekly, signalCandle.time),
-          8
-        )
+      ? detectBias(candles.weekly, weeklyIndex, 8)
+      : "neutral";
+  const monthlyBias =
+    candles.weekly.length >= 4
+      ? detectBias(candles.weekly, weeklyIndex, 4)
       : "neutral";
   const nearestZones = findNearestZones(zones, signalCandle.close, config);
   const h4Setup = detectH4Setup(candles.h4, h4Index, nearestZones, config);
@@ -132,6 +133,7 @@ function buildContext(candles, zones, m3Index, config) {
     dailyIndex,
     dailyBias,
     weeklyBias,
+    monthlyBias,
     nearestZones,
     h4Setup,
     m15Trigger,
@@ -181,10 +183,12 @@ function scoreDirection(direction, context, config) {
   }
   if (zone.fresh) addScore(10, "fresh HTF zone");
   if (targetRoom >= 3) addScore(10, "clear TP room >= 3R");
+  if (context.monthlyBias === direction) addScore(10, "maandelijkse bias aligned");
   if (context.volumeConfirms) addScore(5, "volume confirms");
   if (conflict) addPenalty(20, "HTF conflict");
   if (context.chop) addPenalty(25, "price inside chop");
   if (targetRoom < 2) addPenalty(20, "too close to opposing zone");
+  if (context.monthlyBias !== "neutral" && context.monthlyBias !== direction) addPenalty(10, "maandelijkse bias opposed");
   if (entrySignals.late) addPenalty(15, "late entry after extended move");
 
   return {
@@ -196,6 +200,7 @@ function scoreDirection(direction, context, config) {
     m15Trigger: context.m15Trigger.name,
     dailyBias: context.dailyBias,
     weeklyBias: context.weeklyBias,
+    monthlyBias: context.monthlyBias,
     stop,
     targetRoom,
     reasons,
@@ -224,12 +229,31 @@ function playTrade(m3, signalIndex, setup, context, config) {
   const entryCandle = m3[signalIndex];
   if (!entryCandle || !m3[signalIndex + 1]) return null;
 
+  const entry = entryCandle.close;
+  const risk = Math.abs(entry - setup.stop.price);
+
+  // Wick-fill TP1: for rejection signals, aim at the wick top (long) / wick bottom (short)
+  let partials = config.partials;
+  if (setup.entrySignal === "m3_rejection" && risk > 0) {
+    const wickPrice = setup.direction === "long" ? entryCandle.high : entryCandle.low;
+    const wickR = setup.direction === "long"
+      ? (wickPrice - entry) / risk
+      : (entry - wickPrice) / risk;
+    if (wickR > 0.05 && wickR < config.partials.at(-1).r) {
+      partials = [
+        { r: round(wickR, 2),                             size: 0.33 },
+        { r: round(Math.max(2, wickR + 0.5), 1),          size: 0.33 },
+        { r: round(Math.max(3, wickR + 1.0), 1),          size: 0.34 }
+      ];
+    }
+  }
+
   const result = simulateTrade(m3, {
     direction:           setup.direction,
-    entryIndex:          signalIndex + 1,  // evaluate from the candle after the signal
-    entry:               entryCandle.close, // entered at close of signal candle
+    entryIndex:          signalIndex + 1,
+    entry,
     stop:                setup.stop.price,
-    partials:            config.partials,
+    partials,
     moveStopToBEAfterTP: 1,
     maxHoldBars:         config.maxHoldBars,
     feePct:              config.feePct ?? 0,
@@ -241,7 +265,6 @@ function playTrade(m3, signalIndex, setup, context, config) {
 
   return {
     ...result,
-    // Restore signal-candle timing (entry happened at signal close, not next-candle open)
     entryIndex:    signalIndex,
     entryTime:     entryCandle.time,
     signalIndex,
@@ -254,13 +277,32 @@ function playTrade(m3, signalIndex, setup, context, config) {
     grade:         setup.grade,
     dailyBias:     setup.dailyBias,
     weeklyBias:    setup.weeklyBias,
+    monthlyBias:   setup.monthlyBias,
     h4Setup:       setup.setupName,
     m15Trigger:    setup.m15Trigger,
     entrySignal:   setup.entrySignal,
     reasons:       setup.reasons,
     penalties:     setup.penalties,
-    initialRr:     round(setup.targetRoom, 2)
+    initialRr:     round(setup.targetRoom, 2),
+    description:   buildTradeDescription(setup)
   };
+}
+
+function buildTradeDescription({ direction, grade, setupName, entrySignal, dailyBias, monthlyBias, reasons, penalties }) {
+  const gradeLabel = grade === "A_plus" ? "Top" : grade === "A" ? "Sterke" : "Basis";
+  const dirLabel = direction === "long" ? "long" : "short";
+  const signalMap = {
+    m3_bos: "BOS", m3_liquidity_sweep_reclaim: "sweep+reclaim",
+    m3_engulfing: "engulfing", m3_rejection: "wick-fill rejection"
+  };
+  const signalLabel = signalMap[entrySignal] ?? entrySignal;
+  const parts = [`${gradeLabel} ${dirLabel}`];
+  if (setupName && setupName !== "no_clean_h4_setup") parts.push(setupName.replace(/_/g, " "));
+  if (signalLabel && signalLabel !== "no_m3_signal") parts.push(`signaal: ${signalLabel}`);
+  const biasStr = [dailyBias !== "neutral" ? `D1: ${dailyBias}` : null, monthlyBias !== "neutral" ? `1M: ${monthlyBias}` : null].filter(Boolean).join(" · ");
+  if (biasStr) parts.push(biasStr);
+  if (penalties.length) parts.push(`let op: ${penalties[0]}`);
+  return parts.join(" · ");
 }
 
 function detectBias(candles, index, lookback) {

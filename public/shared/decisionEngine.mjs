@@ -2,6 +2,7 @@
 // Wraps marketRegimeEngine.mjs for classification, then scores all strategies.
 
 import { scanMarketRegimeEngine } from "./marketRegimeEngine.mjs";
+import { calcConfluenceScore } from "./confluenceScore.mjs";
 
 const STRATEGY_NAMES = {
   "support-resistance-v1":            "Support / Resistance v1",
@@ -68,11 +69,61 @@ const REGIME_FIT = {
   }
 };
 
+// ─── Exported helpers (testable without candle fixtures) ─────────────────────
+
+export function buildStrategyRouter(regime) {
+  const fitTable = REGIME_FIT[regime] ?? {};
+  return STRATEGY_IDS.map(id => {
+    const fit = fitTable[id] ?? { status: "watch", score: 40, reason: "Geen expliciete aanbeveling voor dit regime." };
+    return { strategyId: id, name: STRATEGY_NAMES[id], ...fit };
+  });
+}
+
+export function buildDecisionSummary({ regime, confidence, strategyRouter }) {
+  const isReliable = confidence >= 70;
+  const recommendedStrategyId = (isReliable && regime !== "chop")
+    ? (strategyRouter.find(s => s.status === "active")?.strategyId ?? null)
+    : null;
+  return { isReliable, recommendedStrategyId };
+}
+
+// ─── Regime signal explainability ─────────────────────────────────────────────
+
+function buildRegimeSignals(signals) {
+  if (!signals) return [];
+  const { atrPct, bullScore, bearScore, overlap, wicky, emaAligned } = signals;
+
+  const atrType = atrPct <= 25 ? "negative" : atrPct >= 75 ? "positive" : "neutral";
+  const atrInterp = atrPct <= 25 ? "Compressie — lage volatiliteit"
+    : atrPct >= 75 ? "Expansie — hoge volatiliteit"
+    : "Gemiddeld — normale volatiliteit";
+
+  const str = Math.max(bullScore, bearScore);
+  const structType = str >= 3 ? (bullScore >= bearScore ? "positive" : "negative") : "neutral";
+  const structInterp = bullScore >= 3 ? `Duidelijke bullish structuur (${bullScore}× HH-HL)`
+    : bearScore >= 3 ? `Duidelijke bearish structuur (${bearScore}× LH-LL)`
+    : "Onduidelijke marktstructuur";
+
+  const overlapType = overlap >= 65 ? "negative" : overlap <= 35 ? "positive" : "neutral";
+  const overlapInterp = overlap >= 65 ? "Hoge overlap — choppy beweging"
+    : overlap <= 35 ? "Lage overlap — directionale bars"
+    : "Matige overlap";
+
+  return [
+    { key: "atr",       label: "ATR percentiel",  value: `${atrPct}%`,                              interpretation: atrInterp,    type: atrType },
+    { key: "structure", label: "Structuur",        value: `Bull ${bullScore}× · Bear ${bearScore}×`, interpretation: structInterp, type: structType },
+    { key: "overlap",   label: "Bar-overlap",      value: `${overlap}%`,                             interpretation: overlapInterp, type: overlapType },
+    { key: "ema",       label: "EMA alignment",    value: emaAligned ? "Ja" : "Nee",                 interpretation: emaAligned ? "Close > EMA20 > EMA50 (of inverse)" : "Geen EMA-alignment", type: emaAligned ? "positive" : "neutral" },
+    { key: "wicky",     label: "Wicky bars",       value: wicky ? "Ja" : "Nee",                      interpretation: wicky ? "Wicky bars gedetecteerd — mogelijke uitputting" : "Geen uitputtingssignaal", type: wicky ? "negative" : "positive" }
+  ];
+}
+
 // ─── Public ───────────────────────────────────────────────────────────────────
 
 export function makeRegimeDecision({ entryCandles, levelCandles, candlesByResolution = {}, options = {} }) {
   const regimeScan = scanMarketRegimeEngine({ entryCandles, levelCandles, candlesByResolution, options });
   const meta = regimeScan.meta;
+  const confluence = calcConfluenceScore({ candlesByResolution });
 
   if (!meta?.currentRegime || meta.currentRegime.label === "unknown") {
     return {
@@ -84,25 +135,20 @@ export function makeRegimeDecision({ entryCandles, levelCandles, candlesByResolu
       riskModifier:          1.0,
       recommendedStrategyId: null,
       strategyRouter:        [],
-      currentPrice:          regimeScan.currentPrice ?? 0
+      regimeSignals:         [],
+      currentPrice:          regimeScan.currentPrice ?? 0,
+      confluence
     };
   }
 
   const { currentRegime, routing } = meta;
   const regime     = currentRegime.label;
   const confidence = currentRegime.confidence;
-  const isReliable = confidence >= 70;
   const bias       = currentRegime.direction ?? "neutral";
-  const fitTable   = REGIME_FIT[regime] ?? {};
 
-  const strategyRouter = STRATEGY_IDS.map(id => {
-    const fit = fitTable[id] ?? { status: "watch", score: 40, reason: "Geen expliciete aanbeveling voor dit regime." };
-    return { strategyId: id, name: STRATEGY_NAMES[id], ...fit };
-  });
-
-  const recommendedStrategyId = (isReliable && regime !== "chop")
-    ? (strategyRouter.find(s => s.status === "active")?.strategyId ?? null)
-    : null;
+  const strategyRouter = buildStrategyRouter(regime);
+  const { isReliable, recommendedStrategyId } = buildDecisionSummary({ regime, confidence, strategyRouter });
+  const regimeSignals = buildRegimeSignals(currentRegime.signals);
 
   return {
     regime,
@@ -113,6 +159,8 @@ export function makeRegimeDecision({ entryCandles, levelCandles, candlesByResolu
     riskModifier:          routing.riskModifier ?? 1.0,
     recommendedStrategyId,
     strategyRouter,
-    currentPrice:          regimeScan.currentPrice ?? 0
+    regimeSignals,
+    currentPrice:          regimeScan.currentPrice ?? 0,
+    confluence
   };
 }

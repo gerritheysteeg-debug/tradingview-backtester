@@ -42,12 +42,24 @@
 - [x] Backtest-realisme: candle-intrabar ambiguïteit — intrabarOrder pessimistisch/optimistisch/willekeurig in simulator.
 - [x] Walk-forward / out-of-sample splits — outOfSamplePct optie, IS vs OOS metrics panel in UI.
 - [x] Backtest-realisme: funding rate impact voor perpetuals — fundingRatePct8h per 8u in simulator en UI.
-- [ ] Live advies endpoint hard testen (lege data, rare parameters, Deribit-fouten).
-- [ ] Doopiecash v2: maandelijkse context en meer precieze wick-fill targets.
-- [ ] Doopiecash v2: setup-uitleg per trade zichtbaar in detailpaneel.
-- [ ] SMC/Doopiecash testfixtures met verwachte signalen (entry/stop/TP/R).
-- [ ] Instrument-filter: standaard alleen BTC/ETH/PAXG/BNB/SOL tonen.
-- [ ] Multi-timeframe confluence score: 1W, 1D, 4h, entry timeframe.
+- [x] Live advies endpoint hardening: input-validatie (onbekende strategie → 400), Promise.allSettled voor partiële Deribit-fouten, HTTP-timeout van 12s.
+- [x] Doopiecash v2: maandelijkse context (laatste 4 wekelijkse candles als proxy) en wick-fill targets voor rejection-signalen.
+- [x] Doopiecash v2: setup-uitleg (description) per trade, zichtbaar als tooltip op trade-rij.
+- [x] SMC/Doopiecash testfixtures met verwachte signalen (16 nieuwe tests, 64 totaal).
+- [x] Instrument-filter: standaard BTC/ETH/PAXG/BNB/SOL; toggle "+ Meer valuta's" voor alle Deribit-currencies.
+- [x] Multi-timeframe confluence score: confluenceScore.mjs (1W/1D/4h), geïntegreerd in regime-panel.
+
+## Sprint 2 — Bruikbaarheid & inzicht
+
+- [ ] Decision Engine explainability: regime-signalen (ATR, structuur, overlap, EMA, wicky bars) zichtbaar in "Welke strategie nu?" panel.
+- [ ] Unit tests voor `decisionEngine.mjs`: per regime strategie-routing getest, confidence-drempel, chop-blokkering (13 tests, 77 totaal).
+- [ ] Trade detailpaneel: klik op een trade → paneel toont entry/stop/TP, R bruto/netto, kosten, MFE/MAE, exitReden, score, grade, setup-uitleg, redenen en penalties.
+- [ ] Preset vergelijking: "Vergelijk presets" link in sidebar → selecteer 2–3 presets → vergelijkingstabel met trades, winrate, PF, gross R, net R, max DD en OOS R.
+- [x] Multi-instrument scanner: scan BTC/ETH/SOL/+ tegelijk, toon regime + confidence + bias + aanbeveling + MTF confluence. Configureerbare instrumentenlijst (localStorage). Klik op rij laadt instrument.
+- [x] Alert/watchlist workflow: "regime betrouwbaar" en "setup actief" als alert-condities, polling elke 60s, browser Notification API, "+ Alert" vanuit regime-paneel en alerts-sectie. Actieve alerts tonen in Alerts-sectie.
+- [x] Datakwaliteit-paneel: pill-rij onder metrics met candle-teller + staleness per timeframe na elke backtest.
+- [x] Rapport/export: HTML/PDF backtest-rapport met equity curve, maandelijks breakdown, walk-forward en Monte Carlo.
+- [x] Parameter optimalisatie (gecontroleerd): grid search + OOS ranking op robustness.
 
 ## Later pas met expliciete toestemming
 

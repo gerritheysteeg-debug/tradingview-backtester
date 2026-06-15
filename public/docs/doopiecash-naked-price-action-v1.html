@@ -15,6 +15,13 @@
     .step { display: flex; gap: 12px; margin: 8px 0; }
     .step-num { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-2); color: #000; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
     .back { display: inline-block; margin-bottom: 24px; font-size: 13px; color: var(--accent-2); text-decoration: none; }
+    .note { background: var(--surface-2); border-left: 3px solid var(--accent-2); padding: 12px 16px; border-radius: 0 6px 6px 0; font-size: 13px; margin: 16px 0; }
+    .grade { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 600; }
+    .grade-aplus { background: #1a3a2a; color: #4cc9b0; }
+    .grade-a { background: #1a2d3a; color: #60b4e0; }
+    .grade-b { background: #2a2a1a; color: #f0c040; }
+    td .pos { color: #4cc9b0; }
+    td .neg { color: #ff6b6b; }
   </style>
 </head>
 <body>
@@ -31,33 +38,67 @@
   <h2 style="margin-top:24px;font-size:15px;">Timeframes (top-down)</h2>
   <table>
     <tr><th>Timeframe</th><th>Rol</th></tr>
-    <tr><td>1W</td><td>Macro bias · major swing structuur</td></tr>
+    <tr><td>1M (proxy)</td><td>Maandelijkse bias via laatste 4 wekelijkse candles — sterkste filter</td></tr>
+    <tr><td>1W</td><td>Weekly swing structuur · major liquidity zones</td></tr>
     <tr><td>1D</td><td>Daily trend richting · zone identificatie</td></tr>
-    <tr><td>4H</td><td>Setup zone · rejection of reclaim</td></tr>
+    <tr><td>4H</td><td>Setup zone · rejection of reclaim · BOS detectie</td></tr>
     <tr><td>15m</td><td>Triggerzone · BOS bevestiging</td></tr>
     <tr><td>3m</td><td>Sniper entry · engulfing of reclaim candle</td></tr>
   </table>
 
   <h2 style="margin-top:24px;font-size:15px;">Setup stappen</h2>
-  <div class="step"><div class="step-num">1</div><div style="font-size:13px;">Weekly + Daily geven duidelijke bias (bullish of bearish marktstructuur).</div></div>
-  <div class="step"><div class="step-num">2</div><div style="font-size:13px;">4H zone identificeren: OB, FVG, supply/demand of naked level.</div></div>
-  <div class="step"><div class="step-num">3</div><div style="font-size:13px;">15m trigger: candle close die de zone bevestigt (rejection of reclaim).</div></div>
-  <div class="step"><div class="step-num">4</div><div style="font-size:13px;">3m entry op BOS, engulfing of continuation candle.</div></div>
+  <div class="step"><div class="step-num">1</div><div style="font-size:13px;"><strong>Maandelijkse + Daily bias</strong> — laatste 4 wekelijkse candles geven de maandelijkse richting; dagelijkse closes bepalen de daily trend. Beide moeten aligned zijn voor de hoogste score.</div></div>
+  <div class="step"><div class="step-num">2</div><div style="font-size:13px;"><strong>4H zone</strong> — identificeer een V-patroon, BOS of rejection van een naked level. De setup-naam (bijv. <em>v_pattern_long_bos</em>) wordt meegenomen in de score en de trade-omschrijving.</div></div>
+  <div class="step"><div class="step-num">3</div><div style="font-size:13px;"><strong>15m trigger</strong> — candle close die de 4H zone bevestigt: breakout boven recente high of breakout onder recente low.</div></div>
+  <div class="step"><div class="step-num">4</div><div style="font-size:13px;"><strong>3m sniper-entry</strong> — BOS met volume-bevestiging, of rejection-candle (wick-entry). Bij een rejection gebruikt de engine automatisch wick-fill TP1.</div></div>
+
+  <h2 style="margin-top:24px;font-size:15px;">Scoringsmodel (v2)</h2>
+  <p style="font-size:13px;">Elke setup krijgt een score op basis van confluentiefactoren. Minimum score voor een entry is <strong>70 punten</strong>; maximaal zijn ~130 punten haalbaar.</p>
+
+  <table>
+    <tr><th>Factor</th><th>Punten</th><th>Toelichting</th></tr>
+    <tr><td>4H setup aanwezig</td><td class="pos">+30</td><td>V-patroon BOS of rejection op 4H</td></tr>
+    <tr><td>Daily bias aligned</td><td class="pos">+25</td><td>Daily candle richting klopt met setup</td></tr>
+    <tr><td>15m breakout bevestigd</td><td class="pos">+20</td><td>Close boven/onder recente high/low op 15m</td></tr>
+    <tr><td>Volume bevestiging</td><td class="pos">+15</td><td>3m volume > gemiddelde × 1.2</td></tr>
+    <tr><td>3m BOS signaal</td><td class="pos">+10</td><td>Break of structure op entry-timeframe</td></tr>
+    <tr><td>Maandelijkse bias aligned</td><td class="pos">+10</td><td>Laatste 4 wekelijkse candles aligned met richting</td></tr>
+    <tr><td>Rejection entry (wick)</td><td class="pos">+10</td><td>Wick-rejection candle op 3m als entry</td></tr>
+    <tr><td>Daily bias tegengesteld</td><td class="neg">−10</td><td>Penalty: daily tegenstelt</td></tr>
+    <tr><td>Maandelijkse bias tegengesteld</td><td class="neg">−10</td><td>Penalty: 4W weekly richting tegenstelt</td></tr>
+  </table>
+
+  <h2 style="margin-top:24px;font-size:15px;">Grade systeem</h2>
+  <table>
+    <tr><th>Grade</th><th>Score</th><th>Beschrijving</th></tr>
+    <tr><td><span class="grade grade-aplus">A+</span></td><td>≥ 110</td><td>Alle confluentiefactoren aligned, maandelijkse + daily bias bevestigd</td></tr>
+    <tr><td><span class="grade grade-a">A</span></td><td>85 – 109</td><td>Sterke setup met minimaal 4 factoren aligned</td></tr>
+    <tr><td><span class="grade grade-b">B</span></td><td>70 – 84</td><td>Voldoende basis, minder confluentiefactoren</td></tr>
+  </table>
+  <p style="font-size:13px;color:var(--muted);">Setups onder 70 punten worden genegeerd.</p>
 
   <h2 style="margin-top:24px;font-size:15px;">Stop &amp; Targets</h2>
   <table>
     <tr><th>Niveau</th><th>Omschrijving</th></tr>
     <tr><td>Stop</td><td>Voorbij de 4H zone (swing low/high)</td></tr>
-    <tr><td>TP1</td><td>Vorige 15m/4H swing</td></tr>
+    <tr><td>TP1</td><td>Vorige 15m/4H swing — of wick-fill bij rejection entry</td></tr>
     <tr><td>TP2</td><td>Daily liquidity / HTF zone</td></tr>
     <tr><td>TP3</td><td>Weekly target of trail</td></tr>
   </table>
+
+  <div class="note">
+    Bij een <strong>rejection-entry (wick)</strong> past de engine automatisch wick-fill targets toe: TP1 wordt de top van de wick (wick-fill op 1/3 positie), TP2 en TP3 schuiven op basis van de wick-grootte. Dit geeft een meer realistische partiële exit voor wick-catches.
+  </div>
+
+  <h2 style="margin-top:24px;font-size:15px;">Setup-omschrijving (tooltip)</h2>
+  <p style="font-size:13px;">Elke trade in de backtester heeft een automatisch gegenereerde Nederlandstalige omschrijving. Beweeg over een trade-rij om de beschrijving te zien, met daarin: grade + richting, setup-naam, entry-signaal, bias-samenvatting en eventuele penalties.</p>
 
   <h2 style="margin-top:24px;font-size:15px;">Niet gebruiken bij</h2>
   <ul style="font-size:13px;line-height:1.8;">
     <li>Smalle chop of consolidatie zonder duidelijke zones</li>
     <li>Lage liquiditeit (weekend, pre-markt)</li>
-    <li>Conflicterende bias tussen Weekly en Daily</li>
+    <li>Conflicterende bias tussen maandelijks en daily</li>
+    <li>Score onder 70 (wordt automatisch gefilterd)</li>
   </ul>
 </body>
 </html>

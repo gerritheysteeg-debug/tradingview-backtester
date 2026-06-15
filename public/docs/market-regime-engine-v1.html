@@ -16,18 +16,28 @@
     .regime { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; background: var(--surface-2); margin: 6px 0; font-size: 13px; }
     .regime-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
     .note { background: var(--surface-2); border-left: 3px solid var(--accent-2); padding: 12px 16px; border-radius: 0 6px 6px 0; font-size: 13px; margin: 16px 0; }
+    .conf-badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 600; margin-right: 4px; }
+    .conf-ok { background: #1a3a2a; color: #4cc9b0; }
+    .conf-warn { background: #2a2510; color: #f0c040; }
+    .conf-bad { background: #2a1a1a; color: #ff6b6b; }
+    .status-pill { display: inline-block; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
+    .status-active { background: #1a3a2a; color: #4cc9b0; }
+    .status-allowed { background: #1a2a3a; color: #60b4e0; }
+    .status-observe { background: #2a2a1a; color: #f0c040; }
+    .status-blocked { background: #2a1a1a; color: #ff6b6b; }
   </style>
 </head>
 <body>
   <a class="back" href="javascript:history.back()">← Terug</a>
   <h1>Market Regime Engine v1</h1>
-  <p style="color:var(--muted);margin-bottom:16px;">Meta-strategie · Geen directe entries · Bepaalt welke strategie geschikt is</p>
+  <p style="color:var(--muted);margin-bottom:16px;">Beslislaag · Geen directe entries · Bepaalt welke strategie geschikt is</p>
   <span class="tag">Meta-filter</span>
   <span class="tag">Regime detectie</span>
   <span class="tag">ATR + structuur</span>
+  <span class="tag">MTF confluence</span>
 
   <div class="note">
-    De Market Regime Engine is geen entry-strategie. Het is een beslislaag die bepaalt welke andere strategie op dit moment actief mag zijn.
+    De Market Regime Engine is geen entry-strategie. Het is een <strong>beslislaag</strong> die bepaalt welke andere strategie op dit moment actief mag zijn — beschikbaar via de knop <strong>"Welke strategie nu?"</strong> in de sidebar.
   </div>
 
   <h2 style="margin-top:24px;font-size:15px;">Regimes</h2>
@@ -39,7 +49,16 @@
   <div class="regime"><div class="regime-dot" style="background:#ff6b6b"></div><div><strong>Chop</strong> — rommelige markt, veel overlap, geen richting → geen trade aanbevolen</div></div>
   <div class="regime"><div class="regime-dot" style="background:#9b7fcf"></div><div><strong>Uitputting</strong> — late trendfase met grote wicks en falende continuations → gebruik Liquidity voor reversal</div></div>
 
-  <h2 style="margin-top:24px;font-size:15px;">Routing tabel</h2>
+  <h2 style="margin-top:24px;font-size:15px;">Confidence &amp; betrouwbaarheid</h2>
+  <p style="font-size:13px;">De engine geeft naast het regime ook een confidence-percentage terug, afgeleid van hoe sterk de detectiesignalen overeenkomen.</p>
+  <table>
+    <tr><th>Label</th><th>Confidence</th><th>Betekenis</th></tr>
+    <tr><td><span class="conf-badge conf-ok">Betrouwbaar</span></td><td>≥ 70%</td><td>Signalen zijn duidelijk; aanbeveling is geldig</td></tr>
+    <tr><td><span class="conf-badge conf-warn">Twijfelachtig</span></td><td>55–69%</td><td>Regime deels herkenbaar; wees selectief met entries</td></tr>
+    <tr><td><span class="conf-badge conf-bad">Onbetrouwbaar</span></td><td>&lt; 55%</td><td>Signalen conflicteren; sla de sessie over</td></tr>
+  </table>
+
+  <h2 style="margin-top:24px;font-size:15px;">Routeringstabel</h2>
   <table>
     <tr><th>Regime</th><th>Toegestane strategieën</th><th>Risk modifier</th></tr>
     <tr><td>Trend</td><td>Trend Pullback, Doopiecash</td><td>1.0×</td></tr>
@@ -50,7 +69,25 @@
     <tr><td>Uitputting</td><td>Liquidity SMC</td><td>0.8×</td></tr>
   </table>
 
-  <h2 style="margin-top:24px;font-size:15px;">Hoe werkt de detectie?</h2>
+  <p style="font-size:13px;">Elke strategie krijgt een van de volgende statussen in de routeringstabel:</p>
+  <p style="font-size:13px;">
+    <span class="status-pill status-active">actief</span> — aanbevolen voor dit regime &nbsp;
+    <span class="status-pill status-allowed">toegestaan</span> — kan gebruikt worden &nbsp;
+    <span class="status-pill status-observe">observeer</span> — wacht af &nbsp;
+    <span class="status-pill status-blocked">geblokkeerd</span> — niet handelen
+  </p>
+
+  <h2 style="margin-top:24px;font-size:15px;">MTF Confluence score</h2>
+  <p style="font-size:13px;">Naast het regime berekent de engine een <strong>Multi-Timeframe Confluence score</strong> (0–100%) op basis van de bias-overeenstemming op drie hogere timeframes:</p>
+  <table>
+    <tr><th>Timeframe</th><th>Lookback</th><th>Min. candles</th></tr>
+    <tr><td>1W</td><td>8 weken</td><td>8</td></tr>
+    <tr><td>1D</td><td>18 dagen</td><td>8</td></tr>
+    <tr><td>4H</td><td>12 bars</td><td>8</td></tr>
+  </table>
+  <p style="font-size:13px;">Per timeframe wordt een bias bepaald (bullish / bearish / neutraal). De score geeft aan hoeveel procent van de timeframes dezelfde dominante richting wijzen. Een score van 100% betekent dat 1W, 1D en 4H alle drie dezelfde kant op wijzen — de sterkst mogelijke richtigbevestiging.</p>
+
+  <h2 style="margin-top:24px;font-size:15px;">Hoe werkt de regime-detectie?</h2>
   <table>
     <tr><th>Signaal</th><th>Hoe gemeten</th></tr>
     <tr><td>ATR percentiel</td><td>Wilder ATR(14) t.o.v. 30-bars lookback window</td></tr>
@@ -62,14 +99,14 @@
 
   <h2 style="margin-top:24px;font-size:15px;">Praktisch gebruik</h2>
   <ol style="font-size:13px;line-height:1.9;padding-left:20px;">
-    <li>Run de Market Regime Engine als eerste op elke asset.</li>
-    <li>Lees het regime en de confidence score af (≥70% = betrouwbaar).</li>
-    <li>Kies vervolgens de aanbevolen strategie voor de backtest of advies.</li>
-    <li>Pas de positiegrootte aan via de risk modifier.</li>
+    <li>Klik <strong>"Welke strategie nu?"</strong> in de sidebar voor het geselecteerde instrument.</li>
+    <li>Lees het regime en het betrouwbaarheidslabel af. Onder 55% confidence: geen trade.</li>
+    <li>Kijk naar de MTF confluence — hoe hoger, hoe sterker de directionele bevestiging.</li>
+    <li>Selecteer de aanbevolen strategie en pas de positiegrootte aan via de risk modifier.</li>
   </ol>
 
   <div class="note">
-    De echte edge zit niet alleen in entries, maar in het <strong>vermijden van trades in het verkeerde regime</strong>.
+    De echte edge zit niet alleen in entries, maar in het <strong>vermijden van trades in het verkeerde regime</strong>. Een Chop- of lage-confidence sessie overslaan is net zo waardevol als een goede trade.
   </div>
 </body>
 </html>

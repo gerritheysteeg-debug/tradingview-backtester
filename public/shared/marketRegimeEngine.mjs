@@ -106,7 +106,8 @@ function isExhausted(candles, wickRatio, lookback = 5) {
 
 function classifyRegime(candles, atrVals, atrOffset, config, emaFastVals, emaSlowVals) {
   const n = candles.length;
-  if (n < 5) return { label: "chop", confidence: 30 };
+  const emptySignals = { atrPct: 0, bullScore: 0, bearScore: 0, overlap: 0, wicky: false, emaAligned: false };
+  if (n < 5) return { label: "chop", confidence: 30, signals: emptySignals };
 
   const atrPct = atrPercentileAt(atrVals, atrVals.length - 1, config.atrPercentileLookback);
   const { highs, lows } = detectSwings(candles, config.swingWindow);
@@ -118,25 +119,27 @@ function classifyRegime(candles, atrVals, atrOffset, config, emaFastVals, emaSlo
   const lastClose = candles.at(-1).close;
   const emaAligned = (lastClose > eFast && eFast > eSlow) || (lastClose < eFast && eFast < eSlow);
 
+  const signals = { atrPct, bullScore, bearScore, overlap, wicky, emaAligned };
+
   // Compression: very low ATR
   if (atrPct <= 25) {
-    return { label: "compression", confidence: Math.round(75 + (25 - atrPct) * 0.8) };
+    return { label: "compression", confidence: Math.round(75 + (25 - atrPct) * 0.8), signals };
   }
   // Expansion: very high ATR, recent breakout from structure
   if (atrPct >= 80 && (bullScore >= 3 || bearScore >= 3)) {
-    return { label: "expansion", confidence: Math.round(65 + atrPct * 0.3) };
+    return { label: "expansion", confidence: Math.round(65 + atrPct * 0.3), signals };
   }
   // Exhaustion: late trend with wicky bars
   if (wicky && (bullScore >= 2 || bearScore >= 2) && atrPct > 40) {
-    return { label: "exhaustion", confidence: 72 };
+    return { label: "exhaustion", confidence: 72, signals };
   }
   // Chop: high overlap, unclear structure
   if (overlap >= 65 && bullScore < 2 && bearScore < 2) {
-    return { label: "chop", confidence: Math.round(55 + overlap * 0.3) };
+    return { label: "chop", confidence: Math.round(55 + overlap * 0.3), signals };
   }
   // Range: price oscillates without clear HH-HL or LH-LL
   if (!emaAligned && bullScore < 3 && bearScore < 3 && atrPct < 60) {
-    return { label: "range", confidence: 65 };
+    return { label: "range", confidence: 65, signals };
   }
   // Trend: clear structure + EMA aligned
   if ((bullScore >= 3 || bearScore >= 3) && emaAligned) {
@@ -144,10 +147,11 @@ function classifyRegime(candles, atrVals, atrOffset, config, emaFastVals, emaSlo
     return {
       label: "trend",
       direction: bullScore >= bearScore ? "long" : "short",
-      confidence: Math.round(60 + str * 6)
+      confidence: Math.round(60 + str * 6),
+      signals
     };
   }
-  return { label: "range", confidence: 55 };
+  return { label: "range", confidence: 55, signals };
 }
 
 // ─── Strategy routing ─────────────────────────────────────────────────────────
@@ -190,7 +194,8 @@ function buildRegimeTimeline(h4Candles, config) {
       time:       h4Candles[i].time,
       label:      regime.label,
       direction:  regime.direction ?? null,
-      confidence: regime.confidence
+      confidence: regime.confidence,
+      signals:    regime.signals ?? null
     });
   }
   return timeline;
