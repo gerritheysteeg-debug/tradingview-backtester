@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trade Journaal · Trading Research</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { background: var(--bg); }
+
+    .journal-shell {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 28px 24px 60px;
+    }
+
+    /* ── Header ── */
+    .journal-page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .journal-back { font-size: 12px; color: var(--muted); text-decoration: none; display: block; margin-bottom: 4px; }
+    .journal-back:hover { color: var(--text); }
+    .journal-page-title { font-size: 22px; font-weight: 700; margin: 0; }
+    .journal-header-actions { display: flex; gap: 8px; align-items: center; }
+
+    /* ── Stats row ── */
+    .journal-stats-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .jstat {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 16px;
+      min-width: 110px;
+    }
+    .jstat small { display: block; color: var(--muted); font-size: 11px; margin-bottom: 2px; }
+    .jstat strong { font-size: 20px; font-weight: 700; }
+
+    /* ── Filter tabs ── */
+    .journal-filters {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .filter-tab {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.12s, color 0.12s;
+    }
+    .filter-tab:hover { background: var(--panel-2); color: var(--text); }
+    .filter-tab.active { background: var(--panel-2); color: var(--text); border-color: var(--accent); }
+
+    /* ── Table ── */
+    .journal-table-wrap { overflow-x: auto; }
+    .journal-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .journal-table th {
+      background: var(--panel);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+    .journal-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .journal-table tr:hover td { background: var(--panel-2); }
+    .journal-empty { color: var(--muted); font-size: 13px; padding: 32px 12px; }
+
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .status-open     { background: rgba(242,184,75,0.15); color: var(--warning); border: 1px solid rgba(242,184,75,0.3); }
+    .status-closed   { background: rgba(76,201,176,0.12); color: var(--accent-2); border: 1px solid rgba(76,201,176,0.3); }
+    .status-cancelled{ background: rgba(147,161,168,0.12); color: var(--muted); border: 1px solid var(--line); }
+
+    .dir-long  { color: var(--accent-2); font-weight: 700; }
+    .dir-short { color: #ff9966; font-weight: 700; }
+
+    /* ── Modal ── */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 100;
+    }
+    .modal-dialog {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 101;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      width: min(680px, 95vw);
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px 14px;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+    .modal-header h2 { font-size: 16px; margin: 0; }
+    .modal-body {
+      overflow-y: auto;
+      padding: 20px 22px;
+      flex: 1;
+    }
+    .modal-footer {
+      padding: 14px 22px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .modal-footer .spacer { flex: 1; }
+
+    /* ── Form layout ── */
+    .modal-section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 18px 0 10px;
+    }
+    .modal-section-label:first-child { margin-top: 0; }
+    .modal-read-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .modal-read-item {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    .modal-read-item small { display: block; color: var(--muted); font-size: 10px; margin-bottom: 2px; }
+    .modal-read-item span { font-size: 13px; font-weight: 600; }
+
+    .modal-field-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .modal-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .modal-field.full { grid-column: 1 / -1; }
+    .modal-field label { font-size: 11px; color: var(--muted); font-weight: 600; }
+    .modal-field input,
+    .modal-field select,
+    .modal-field textarea {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 7px 10px;
+      font-size: 13px;
+      width: 100%;
+    }
+    .modal-field input:focus,
+    .modal-field select:focus,
+    .modal-field textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .modal-field textarea { resize: vertical; min-height: 72px; }
+
+    .calc-r-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .calc-r-row span { font-size: 12px; color: var(--muted); }
+
+    .danger-btn { color: var(--danger) !important; border-color: var(--danger) !important; }
+    .danger-btn:hover { background: rgba(255,107,107,0.1) !important; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      z-index: 200;
+      box-shadow: var(--shadow);
+    }
+
+    @media (max-width: 600px) {
+      .modal-field-grid { grid-template-columns: 1fr; }
+      .modal-field.full { grid-column: 1; }
+      .journal-page-header { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+<div class="journal-shell">
+
+  <header class="journal-page-header">
+    <div>
+      <a href="/" class="journal-back">← Trading Research Backtester</a>
+      <h1 class="journal-page-title">📓 Trade Journaal</h1>
+    </div>
+    <div class="journal-header-actions">
+      <button id="add-trade-btn" class="secondary-button" type="button">+ Manuele trade</button>
+      <button id="export-csv-btn" class="icon-button" type="button" title="Exporteer als CSV">↓ CSV</button>
+    </div>
+  </header>
+
+  <div id="journal-stats" class="journal-stats-row"></div>
+
+  <div class="journal-filters">
+    <button class="filter-tab active" data-filter="all">Alle</button>
+    <button class="filter-tab" data-filter="open">Open</button>
+    <button class="filter-tab" data-filter="closed">Gesloten</button>
+    <button class="filter-tab" data-filter="cancelled">Geannuleerd</button>
+  </div>
+
+  <div class="journal-table-wrap">
+    <table class="journal-table">
+      <thead>
+        <tr>
+          <th>Datum</th>
+          <th>Instrument</th>
+          <th>Stijl</th>
+          <th>Side</th>
+          <th>Plan entry</th>
+          <th>Plan stop</th>
+          <th>Plan TP1 / TP2 / TP3</th>
+          <th>RR</th>
+          <th>Score</th>
+          <th>Status</th>
+          <th>Werkelijk R</th>
+          <th>Exit reden</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="journal-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="trade-modal" hidden>
+  <div class="modal-backdrop" id="modal-backdrop"></div>
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h2 id="modal-title">Trade</h2>
+      <button id="modal-close" class="icon-button" type="button">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button id="modal-save" class="primary-button" type="button">Opslaan</button>
+      <div class="spacer"></div>
+      <button id="modal-delete" class="icon-button danger-btn" type="button">Verwijder</button>
+      <button id="modal-cancel" class="icon-button" type="button">Annuleer</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script>
+"use strict";
+
+const JOURNAL_KEY = "tradingResearch.journal.v1";
+let _filter  = "all";
+let _editing = null; // current entry being edited (or null = new)
+let _toastTimer;
+
+// ── Storage ──────────────────────────────────────────────────────────────────
+
+function readJournal() {
+  try { return JSON.parse(localStorage.getItem(JOURNAL_KEY) ?? "[]"); } catch { return []; }
+}
+function writeJournal(entries) {
+  localStorage.setItem(JOURNAL_KEY, JSON.stringify(entries));
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatDate(ts) {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleDateString("nl-NL", { day: "2-digit", month: "short", year: "numeric" });
+}
+function formatPrice(v) {
+  if (v == null || !isFinite(v)) return "—";
+  if (v >= 1000) return v.toLocaleString("nl-NL", { maximumFractionDigits: 1 });
+  if (v >= 10)   return v.toLocaleString("nl-NL", { maximumFractionDigits: 2 });
+  return v.toLocaleString("nl-NL", { maximumFractionDigits: 5 });
+}
+function esc(v) {
+  if (v == null) return "";
+  return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
+}
+function showToast(msg) {
+  clearTimeout(_toastTimer);
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.hidden = false;
+  _toastTimer = setTimeout(() => { el.hidden = true; }, 4000);
+}
+function styleLabel(k) {
+  return k === "swing" ? "Swing" : k === "day" ? "Day" : k === "scalp" ? "Scalp" : k ?? "—";
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+
+function renderStats(entries) {
+  const el = document.getElementById("journal-stats");
+  const closed = entries.filter(e => e.status === "closed");
+  const open   = entries.filter(e => e.status === "open");
+  const wins   = closed.filter(e => (e.actual?.r ?? 0) > 0);
+  const totalR = closed.reduce((s, e) => s + (e.actual?.r ?? 0), 0);
+  const winRate = closed.length ? Math.round(wins.length / closed.length * 100) : 0;
+  const avgR    = closed.length ? (totalR / closed.length) : 0;
+
+  const stat = (label, value, cls = "") =>
+    `<div class="jstat"><small>${label}</small><strong class="${cls}">${value}</strong></div>`;
+
+  el.innerHTML =
+    stat("Totaal gelogd", entries.length) +
+    stat("Open", open.length, open.length ? "warning" : "") +
+    stat("Gesloten", closed.length) +
+    stat("Win rate", closed.length ? `${winRate}%` : "—", winRate >= 50 ? "positive" : closed.length ? "negative" : "") +
+    stat("Totaal R", closed.length ? `${totalR >= 0 ? "+" : ""}${totalR.toFixed(1)}R` : "—", totalR >= 0 ? "positive" : "negative") +
+    stat("Gem. R", closed.length ? `${avgR >= 0 ? "+" : ""}${avgR.toFixed(2)}R` : "—", avgR >= 0 ? "positive" : "negative");
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────────
+
+function renderTable(entries) {
+  const tbody = document.getElementById("journal-body");
+  const filtered = _filter === "all" ? entries : entries.filter(e => e.status === _filter);
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="13" class="journal-empty">Geen trades gevonden.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(e => {
+    const p   = e.planned ?? {};
+    const act = e.actual  ?? {};
+    const dirCls = e.direction === "long" ? "dir-long" : "dir-short";
+    const dirLabel = e.direction === "long" ? "▲ Long" : "▼ Short";
+    const r   = act.r;
+    const rCls = r == null ? "" : r > 0 ? "positive" : r < 0 ? "negative" : "";
+    const rStr = r != null ? `${r > 0 ? "+" : ""}${Number(r).toFixed(2)}R` : "—";
+    const tp  = [p.tp1, p.tp2, p.tp3].filter(v => v != null).map(formatPrice).join(" / ") || "—";
+
+    return `<tr data-id="${esc(e.id)}">
+      <td>${formatDate(e.createdAt)}</td>
+      <td><strong>${esc(e.instrument)}</strong></td>
+      <td>${styleLabel(e.styleKey)}</td>
+      <td class="${dirCls}">${dirLabel}</td>
+      <td>${formatPrice(p.entry)}</td>
+      <td>${formatPrice(p.stop)}</td>
+      <td style="font-size:12px">${tp}</td>
+      <td>${p.rr != null ? p.rr + "×" : "—"}</td>
+      <td>${p.score ?? "—"}</td>
+      <td><span class="status-badge status-${e.status}">${statusLabel(e.status)}</span></td>
+      <td class="${rCls}"><strong>${rStr}</strong></td>
+      <td style="font-size:12px;color:var(--muted)">${esc(act.exitReason) || "—"}</td>
+      <td><button class="icon-button edit-btn" data-id="${esc(e.id)}" type="button" title="Bewerken">✏</button></td>
+    </tr>`;
+  }).join("");
+
+  tbody.querySelectorAll("tr[data-id]").forEach(row => {
+    row.addEventListener("dblclick", () => openModal(row.dataset.id));
+  });
+  tbody.querySelectorAll(".edit-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => { e.stopPropagation(); openModal(btn.dataset.id); });
+  });
+}
+
+function statusLabel(s) {
+  return s === "open" ? "Open" : s === "closed" ? "Gesloten" : s === "cancelled" ? "Geannuleerd" : s ?? "—";
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+function openModal(entryId) {
+  const entries = readJournal();
+  _editing = entryId ? (entries.find(e => e.id === entryId) ?? null) : null;
+
+  const isNew = !_editing;
+  document.getElementById("modal-title").textContent = isNew ? "Manuele trade toevoegen" : `Trade bewerken · ${_editing?.instrument ?? ""}`;
+  document.getElementById("modal-delete").style.display = isNew ? "none" : "";
+
+  const p   = _editing?.planned  ?? {};
+  const act = _editing?.actual   ?? {};
+
+  const ri = (label, value) => `
+    <div class="modal-read-item">
+      <small>${label}</small>
+      <span>${esc(String(value ?? "—"))}</span>
+    </div>`;
+
+  const readSection = isNew ? "" : `
+    <p class="modal-section-label">Plan (van advies)</p>
+    <div class="modal-read-grid">
+      ${ri("Instrument",  _editing.instrument)}
+      ${ri("Strategie",   _editing.strategyName ?? _editing.strategy)}
+      ${ri("Stijl",       styleLabel(_editing.styleKey))}
+      ${ri("Side",        _editing.direction === "long" ? "▲ Long" : "▼ Short")}
+      ${ri("Plan entry",  formatPrice(p.entry))}
+      ${ri("Plan stop",   formatPrice(p.stop))}
+      ${ri("Plan TP1",    formatPrice(p.tp1))}
+      ${ri("Plan TP2",    formatPrice(p.tp2))}
+      ${ri("Plan TP3",    formatPrice(p.tp3))}
+      ${ri("RR",          p.rr != null ? p.rr + "×" : "—")}
+      ${ri("Score",       p.score ?? "—")}
+    </div>
+    ${p.description ? `<p style="font-size:12px;color:var(--muted);margin:8px 0 0">${esc(p.description)}</p>` : ""}`;
+
+  const manualPlanSection = !isNew ? "" : `
+    <p class="modal-section-label">Trade details</p>
+    <div class="modal-field-grid">
+      <div class="modal-field">
+        <label>Instrument</label>
+        <input id="f-instrument" type="text" placeholder="BTC-PERPETUAL" value="${esc(_editing?.instrument ?? "")}">
+      </div>
+      <div class="modal-field">
+        <label>Side</label>
+        <select id="f-direction">
+          <option value="long">▲ Long</option>
+          <option value="short">▼ Short</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label>Plan entry</label>
+        <input id="f-plan-entry" type="number" step="any" placeholder="0" value="${p.entry ?? ""}">
+      </div>
+      <div class="modal-field">
+        <label>Plan stop</label>
+        <input id="f-plan-stop" type="number" step="any" placeholder="0" value="${p.stop ?? ""}">
+      </div>
+      <div class="modal-field">
+        <label>Plan TP1</label>
+        <input id="f-plan-tp1" type="number" step="any" placeholder="0" value="${p.tp1 ?? ""}">
+      </div>
+      <div class="modal-field">
+        <label>Plan TP2</label>
+        <input id="f-plan-tp2" type="number" step="any" placeholder="0" value="${p.tp2 ?? ""}">
+      </div>
+      <div class="modal-field">
+        <label>Plan TP3</label>
+        <input id="f-plan-tp3" type="number" step="any" placeholder="0" value="${p.tp3 ?? ""}">
+      </div>
+      <div class="modal-field">
+        <label>Score (optioneel)</label>
+        <input id="f-plan-score" type="number" step="1" placeholder="—" value="${p.score ?? ""}">
+      </div>
+    </div>`;
+
+  document.getElementById("modal-body").innerHTML = `
+    ${readSection}
+    ${manualPlanSection}
+
+    <p class="modal-section-label">Werkelijke uitkomst</p>
+    <div class="modal-field-grid">
+      <div class="modal-field">
+        <label>Status</label>
+        <select id="f-status">
+          <option value="open"      ${(_editing?.status ?? "open") === "open"      ? "selected" : ""}>Open</option>
+          <option value="closed"    ${(_editing?.status) === "closed"    ? "selected" : ""}>Gesloten</option>
+          <option value="cancelled" ${(_editing?.status) === "cancelled" ? "selected" : ""}>Geannuleerd</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label>Exit reden</label>
+        <select id="f-exit-reason">
+          <option value="" ${!act.exitReason ? "selected" : ""}>— Nog open —</option>
+          <option value="TP1"        ${act.exitReason === "TP1"        ? "selected" : ""}>TP1 geraakt</option>
+          <option value="TP2"        ${act.exitReason === "TP2"        ? "selected" : ""}>TP2 geraakt</option>
+          <option value="TP3"        ${act.exitReason === "TP3"        ? "selected" : ""}>TP3 geraakt</option>
+          <option value="SL"         ${act.exitReason === "SL"         ? "selected" : ""}>Stop loss geraakt</option>
+          <option value="BE"         ${act.exitReason === "BE"         ? "selected" : ""}>Breakeven stop</option>
+          <option value="Trail"      ${act.exitReason === "Trail"       ? "selected" : ""}>Trailing stop</option>
+          <option value="Manueel"    ${act.exitReason === "Manueel"    ? "selected" : ""}>Manueel gesloten</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label>Werkelijk entry</label>
+        <input id="f-act-entry" type="number" step="any" placeholder="—" value="${act.entry ?? ""}">
+      </div>
+      <div class="modal-field">
+        <label>Werkelijk exit</label>
+        <input id="f-act-exit" type="number" step="any" placeholder="—" value="${act.exit ?? ""}">
+      </div>
+      <div class="modal-field">
+        <label>Werkelijk R <span style="font-weight:400;color:var(--muted)">(handmatig of berekend)</span></label>
+        <input id="f-act-r" type="number" step="0.01" placeholder="bijv. 1.5" value="${act.r ?? ""}">
+      </div>
+      <div class="modal-field">
+        <label>Datum gesloten</label>
+        <input id="f-closed-at" type="datetime-local" value="${act.closedAt ? new Date(act.closedAt).toISOString().slice(0,16) : ""}">
+      </div>
+      <div class="modal-field full">
+        <label>Notities (vrij veld — bijv. SL naar winst gezet, partials genomen)</label>
+        <textarea id="f-notes" rows="3" placeholder="Bijv: na TP1 SL naar BE gezet, TP2 niet meer geraakt, manueel gesloten op +1.8R">${esc(act.notes ?? "")}</textarea>
+      </div>
+    </div>
+
+    <div class="calc-r-row">
+      <span>Heb je entry/exit ingevuld maar R nog niet?</span>
+      <button id="calc-r-btn" class="icon-button" type="button">Bereken R</button>
+    </div>`;
+
+  // Wire calculate-R button
+  document.getElementById("calc-r-btn")?.addEventListener("click", () => {
+    const ae = parseFloat(document.getElementById("f-act-entry")?.value);
+    const ax = parseFloat(document.getElementById("f-act-exit")?.value);
+    const ps = parseFloat(document.getElementById("f-plan-stop")?.value || p.stop);
+    const pe = parseFloat(document.getElementById("f-act-entry")?.value || p.entry);
+    const dir = _editing?.direction || document.getElementById("f-direction")?.value || "long";
+    if (!isFinite(ae) || !isFinite(ax) || !isFinite(ps) || !isFinite(pe)) {
+      showToast("Vul entry en exit in om R te berekenen.");
+      return;
+    }
+    const risk = Math.abs(pe - ps);
+    if (risk === 0) { showToast("Risico is 0 — controleer entry en stop."); return; }
+    const pnl = dir === "long" ? (ax - ae) : (ae - ax);
+    const r = Math.round((pnl / risk) * 100) / 100;
+    document.getElementById("f-act-r").value = r;
+  });
+
+  document.getElementById("trade-modal").hidden = false;
+}
+
+function closeModal() {
+  document.getElementById("trade-modal").hidden = true;
+  _editing = null;
+}
+
+function saveModal() {
+  const entries = readJournal();
+  const statusEl   = document.getElementById("f-status");
+  const exitR      = document.getElementById("f-exit-reason");
+  const actEntryEl = document.getElementById("f-act-entry");
+  const actExitEl  = document.getElementById("f-act-exit");
+  const actREl     = document.getElementById("f-act-r");
+  const closedAtEl = document.getElementById("f-closed-at");
+  const notesEl    = document.getElementById("f-notes");
+
+  const actual = {
+    entry:      actEntryEl?.value !== "" ? parseFloat(actEntryEl.value) : null,
+    exit:       actExitEl?.value  !== "" ? parseFloat(actExitEl.value)  : null,
+    exitReason: exitR?.value ?? "",
+    r:          actREl?.value !== "" ? parseFloat(actREl.value) : null,
+    notes:      notesEl?.value?.trim() ?? "",
+    closedAt:   closedAtEl?.value ? new Date(closedAtEl.value).getTime() : null
+  };
+
+  if (_editing) {
+    // Update existing
+    const idx = entries.findIndex(e => e.id === _editing.id);
+    if (idx !== -1) {
+      entries[idx].status = statusEl?.value ?? entries[idx].status;
+      entries[idx].actual = actual;
+    }
+  } else {
+    // New manual entry
+    const instrEl = document.getElementById("f-instrument");
+    const dirEl   = document.getElementById("f-direction");
+    const planned = {
+      entry: parseFloat(document.getElementById("f-plan-entry")?.value) || null,
+      stop:  parseFloat(document.getElementById("f-plan-stop")?.value)  || null,
+      tp1:   parseFloat(document.getElementById("f-plan-tp1")?.value)   || null,
+      tp2:   parseFloat(document.getElementById("f-plan-tp2")?.value)   || null,
+      tp3:   parseFloat(document.getElementById("f-plan-tp3")?.value)   || null,
+      score: parseFloat(document.getElementById("f-plan-score")?.value) || null,
+      rr:    null, description: ""
+    };
+    const newEntry = {
+      id: `jrn-${Date.now()}`,
+      createdAt:   Date.now(),
+      instrument:  instrEl?.value.trim() || "—",
+      strategy:    "manueel",
+      strategyName:"Manueel",
+      styleKey:    null,
+      direction:   dirEl?.value || "long",
+      planned,
+      status:      statusEl?.value ?? "open",
+      actual
+    };
+    entries.unshift(newEntry);
+  }
+
+  writeJournal(entries);
+  closeModal();
+  refresh();
+  showToast("Opgeslagen.");
+}
+
+function deleteEntry(id) {
+  if (!confirm("Trade verwijderen uit journaal?")) return;
+  writeJournal(readJournal().filter(e => e.id !== id));
+  closeModal();
+  refresh();
+  showToast("Verwijderd.");
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────────
+
+function exportCsv() {
+  const entries = readJournal();
+  const rows = [
+    ["Datum","Instrument","Strategie","Stijl","Side","Plan entry","Plan stop","Plan TP1","Plan TP2","Plan TP3","Plan RR","Score","Status","Werkelijk entry","Werkelijk exit","Werkelijk R","Exit reden","Notities"]
+  ];
+  for (const e of entries) {
+    const p = e.planned ?? {};
+    const a = e.actual  ?? {};
+    rows.push([
+      formatDate(e.createdAt), e.instrument, e.strategyName ?? e.strategy, styleLabel(e.styleKey), e.direction,
+      p.entry ?? "", p.stop ?? "", p.tp1 ?? "", p.tp2 ?? "", p.tp3 ?? "", p.rr ?? "", p.score ?? "",
+      e.status, a.entry ?? "", a.exit ?? "", a.r ?? "", a.exitReason ?? "", (a.notes ?? "").replace(/,/g,"；")
+    ]);
+  }
+  const csv  = rows.map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement("a"), { href: url, download: `journaal_${new Date().toISOString().slice(0,10)}.csv` });
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Refresh ───────────────────────────────────────────────────────────────────
+
+function refresh() {
+  const entries = readJournal();
+  renderStats(entries);
+  renderTable(entries);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+document.querySelectorAll(".filter-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".filter-tab").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    _filter = btn.dataset.filter;
+    renderTable(readJournal());
+  });
+});
+
+document.getElementById("add-trade-btn").addEventListener("click", () => openModal(null));
+document.getElementById("export-csv-btn").addEventListener("click", exportCsv);
+document.getElementById("modal-close").addEventListener("click", closeModal);
+document.getElementById("modal-cancel").addEventListener("click", closeModal);
+document.getElementById("modal-backdrop").addEventListener("click", closeModal);
+document.getElementById("modal-save").addEventListener("click", saveModal);
+document.getElementById("modal-delete").addEventListener("click", () => {
+  if (_editing) deleteEntry(_editing.id);
+});
+
+// Listen for storage changes from main app (log trade from advice)
+window.addEventListener("storage", (e) => {
+  if (e.key === JOURNAL_KEY) refresh();
+});
+
+refresh();
+</script>
+</body>
+</html>

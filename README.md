@@ -2,6 +2,18 @@
 
 Lokale dashboard-app voor visueel backtesten, live marktadvies en strategie-onderzoek op crypto-futures. Draait volledig lokaal — geen externe accounts of API-keys nodig.
 
+> **Disclaimer:** deze tool plaatst geen orders en heeft geen koppeling met een broker. Data is afkomstig van de publieke Deribit REST API. Resultaten zijn uitsluitend bedoeld voor onderzoek, niet als financieel advies.
+
+## Aanbevolen workflow
+
+1. Kies instrument en markt
+2. Klik **Welke strategie nu?** → regime-analyse bepaalt welke strategie logisch is
+3. Draai een **backtest** op de aanbevolen strategie
+4. Controleer metrics, equity curve, drawdown en walk-forward
+5. Klik **Advies** voor concrete actuele setup-zones
+6. Analyseer trade details via klik op trade-rij
+7. Exporteer rapport of gebruik Scanner / Optimaliseer voor verder onderzoek
+
 ## Snel starten
 
 Vereist **Node.js 24** of hoger (ESM-modules, geen npm-packages).
@@ -18,7 +30,9 @@ npm test          # 77 unit-tests
 
 ---
 
-## Strategieën
+## Strategieën (5 uitvoerende strategieën + 1 beslislaag)
+
+De tool heeft **vijf backtestbare strategieën**. Daarnaast bestaat de **Market Regime Decision Layer** — een aparte analyse-laag die bepaalt welke strategie het meest passend is voor de huidige marktomgeving. De decision layer is géén zesde strategie; hij backtestet niet en handelt niet.
 
 | Strategie | Type | Beschrijving |
 |---|---|---|
@@ -88,7 +102,11 @@ Voert voor elke handelsstijl tegelijk een scan uit op de actuele marktstructuur 
 | **Day** | 15m | 4h | 90 dagen |
 | **Scalp** | 3m | 15m | 14 dagen |
 
-Per setup: entry-prijs, stop, TP1/TP2/TP3, risk/reward, score en status (**Nu** / **Let op** / **Wacht**). De Day-setup wordt als prijslijnen op de chart getoond.
+Per setup: entry-prijs, stop, TP1/TP2/TP3, risk/reward, score en status (**Nu** / **Let op** / **Wacht**).
+
+- **Klik op een kaart** om de setup in de chart te tonen: dikke gestippelde lijnen voor entry/stop/TP, plus dunne anchor-lijnen die uitleggen *waarom* die prijsniveaus gekozen zijn (bijv. "Support entry (3×)", "Compressie top (12 bars)")
+- De kaart met de hoogste score wordt automatisch geselecteerd bij laden
+- **📓 Log trade** slaat de setup op in het Trade Journaal voor handmatige opvolging
 
 ### Welke strategie nu? (Regime Decision)
 
@@ -129,6 +147,19 @@ De **"🔔 Alerts"**-knop beheert een watchlist met twee condities:
 - Polling elke 60 seconden; browser Notification API + toast bij trigger
 - Alert toevoegen vanuit het regime-paneel via "+ Alert"
 
+### Trade Journaal
+
+`/journal.html` — standalone pagina voor het bijhouden van handmatig geplaatste trades:
+
+- **Log trade** vanuit een advice-kaart: vult entry, stop, TP1/2/3, score en beschrijving automatisch voor
+- **Werkelijke uitkomst** invullen: status (open/gesloten/geannuleerd), werkelijk exit, exit-reden (TP1/TP2/SL/BE/Trail/Manueel), R en notities
+- **Bereken R** automatisch uit werkelijk entry/exit vs. geplande stop-afstand
+- **Manuele trades** toevoegen zonder advies-context
+- **Stats-rij**: totaal gelogd, open, gesloten, win rate, totaal R, gemiddeld R
+- **Filter-tabs**: Alle / Open / Gesloten / Geannuleerd
+- **CSV-export** van het volledige journaal
+- Data opgeslagen in localStorage (`tradingResearch.journal.v1`); live gesynchroniseerd wanneer je logt vanuit het hoofdscherm
+
 ### Preset vergelijking
 
 **"Vergelijk presets"** link in de sidebar laadt 2–3 opgeslagen presets parallel op hetzelfde instrument en toont een vergelijkingstabel: trades, winrate, profit factor, gross R, net R, max DD en OOS R.
@@ -159,8 +190,10 @@ server/
 
 public/
   app.js                # Frontend: charts, form, Monte Carlo, walk-forward, regime, confluence,
-                        # scanner, alerts, preset-vergelijking, trade-detail, rapport, optimalisatie
+                        # scanner, alerts, preset-vergelijking, trade-detail, rapport, optimalisatie,
+                        # advice-kaart klikinteractie, anchor-visualisatie, trade-journaal logging
   index.html            # UI shell
+  journal.html          # Trade Journaal — zelfstandige pagina, geen imports, localStorage
   styles.css            # Dark-theme styling
   docs/                 # Strategie-documentatiepagina's (HTML)
 

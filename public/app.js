@@ -96,7 +96,46 @@ const optimizeComboCountEl = document.querySelector("#optimize-combo-count");
 const runOptimizeEl = document.querySelector("#run-optimize");
 const optimizeResultsEl = document.querySelector("#optimize-results");
 
-const PRESET_STORAGE_KEY = "tradingResearch.presets.v1";
+const PRESET_STORAGE_KEY  = "tradingResearch.presets.v1";
+const JOURNAL_KEY = "tradingResearch.journal.v1";
+
+function readJournal() {
+  try { return JSON.parse(localStorage.getItem(JOURNAL_KEY) ?? "[]"); } catch { return []; }
+}
+function writeJournal(entries) {
+  localStorage.setItem(JOURNAL_KEY, JSON.stringify(entries));
+}
+
+function logTrade(setup, styleKey) {
+  const instrument  = instrumentEl.value ?? "BTC-PERPETUAL";
+  const strategyId  = strategyEl.value  ?? "support-resistance-v1";
+  const strategyName = _strategiesMeta.find(s => s.id === strategyId)?.name ?? strategyId;
+  const entry = {
+    id:           `jrn-${Date.now()}`,
+    createdAt:    Date.now(),
+    instrument,
+    strategy:     strategyId,
+    strategyName,
+    styleKey,
+    direction:    setup.direction,
+    planned: {
+      entry:       setup.entryPrice,
+      stop:        setup.stopPrice,
+      tp1:         setup.tp1,
+      tp2:         setup.tp2,
+      tp3:         setup.tp3,
+      rr:          setup.rr,
+      score:       setup.score ?? null,
+      description: setup.description ?? ""
+    },
+    status: "open",
+    actual: { entry: null, exit: null, exitReason: "", r: null, notes: "", closedAt: null }
+  };
+  const all = readJournal();
+  all.unshift(entry);
+  writeJournal(all);
+  showToast(`Gelogd in journaal: ${instrument} ${setup.direction.toUpperCase()}`);
+}
 
 const PREFERRED_CURRENCIES = ["BTC", "ETH", "PAXG", "BNB", "SOL"];
 let _allCurrencies = [];
@@ -1753,28 +1792,65 @@ function clearAdviceLines() {
   adviceLines = [];
 }
 
-function setupCardHtml(setup) {
+let _lastAdviceData = {};
+
+function setupEntry(s) { return s.entryPrice ?? s.entry; }
+function setupStop(s)  { return s.stopPrice  ?? s.stop;  }
+
+function setupCardHtml(setup, styleKey, idx) {
   if (!setup) return `<div class="advice-empty">Geen setup</div>`;
   const isLong = setup.direction === "long";
   const dirLabel = isLong ? "▲ LONG" : "▼ SHORT";
   const grade = setup.score >= 85 ? "A+" : setup.score >= 75 ? "A" : setup.score >= 65 ? "B" : "–";
   return `
-    <div class="advice-card ${setup.direction}">
+    <div class="advice-card ${setup.direction}" data-style="${styleKey}" data-idx="${idx}" tabindex="0" title="Klik om in chart te tonen">
       <div class="advice-header">
         <span class="badge ${setup.status}">${statusLabel(setup.status)}</span>
         <strong>${dirLabel}</strong>
         <span class="advice-score">Score ${setup.score} · ${grade} · RR ${setup.rr}×</span>
       </div>
       <div class="advice-prices">
-        <div><small>Entry</small><strong>${formatPrice(setup.entryPrice)}</strong></div>
-        <div><small>Stop</small><strong class="negative">${formatPrice(setup.stopPrice)}</strong></div>
+        <div><small>Entry</small><strong>${formatPrice(setupEntry(setup))}</strong></div>
+        <div><small>Stop</small><strong class="negative">${formatPrice(setupStop(setup))}</strong></div>
         <div><small>TP1</small><strong class="positive">${formatPrice(setup.tp1)}</strong></div>
         <div><small>TP2</small><strong class="positive">${formatPrice(setup.tp2)}</strong></div>
         <div><small>TP3</small><strong class="positive">${formatPrice(setup.tp3)}</strong></div>
       </div>
-      <small class="advice-desc">${escapeHtml(setup.description)} · ${escapeHtml(setup.distance)}</small>
+      <small class="advice-desc">${escapeHtml(setup.description)}${setup.distance ? " · " + escapeHtml(setup.distance) : ""}</small>
+      <div class="advice-card-actions">
+        <button class="log-trade-btn icon-button" data-style="${styleKey}" data-idx="${idx}" type="button" title="Log in trade journaal">📓 Log trade</button>
+      </div>
     </div>
   `;
+}
+
+function drawSetupOnChart(setup) {
+  if (!candleSeries || !setup) return;
+  clearAdviceLines();
+  const isLong = setup.direction === "long";
+  const entry  = setupEntry(setup);
+  const stop   = setupStop(setup);
+
+  // Trade plan lines
+  if (entry != null) adviceLines.push(candleSeries.createPriceLine({ price: entry, color: "#ffffff", lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, title: `Entry ${setup.direction.toUpperCase()}`, axisLabelVisible: true }));
+  if (stop  != null) adviceLines.push(candleSeries.createPriceLine({ price: stop,  color: "#ff4040", lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, title: "Stop loss", axisLabelVisible: true }));
+  if (setup.tp1 != null) adviceLines.push(candleSeries.createPriceLine({ price: setup.tp1, color: isLong ? "#4cc9b0" : "#ff9966", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, title: "TP1", axisLabelVisible: true }));
+  if (setup.tp2 != null) adviceLines.push(candleSeries.createPriceLine({ price: setup.tp2, color: isLong ? "#4cc9b0" : "#ff9966", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, title: "TP2", axisLabelVisible: true }));
+  if (setup.tp3 != null) adviceLines.push(candleSeries.createPriceLine({ price: setup.tp3, color: "#d6ff62", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, title: "TP3", axisLabelVisible: true }));
+
+  // Anchor lines (show WHY each level was chosen)
+  const anchorColors = { "entry-basis": "#808898", "stop-basis": "#cc4444", "tp-basis": "#3a9e88" };
+  for (const anchor of (setup.anchors ?? [])) {
+    if (anchor.price == null) continue;
+    adviceLines.push(candleSeries.createPriceLine({
+      price: anchor.price,
+      color: anchorColors[anchor.role] ?? "#666",
+      lineWidth: 1,
+      lineStyle: LightweightCharts.LineStyle.SparseDotted,
+      title: `↑ ${anchor.label}`,
+      axisLabelVisible: false
+    }));
+  }
 }
 
 function renderAdvice({ swing, day, scalp }) {
@@ -1782,23 +1858,43 @@ function renderAdvice({ swing, day, scalp }) {
   adviceSectionEl.classList.toggle("hidden", !anySetup);
   if (!anySetup) { clearAdviceLines(); return; }
 
+  _lastAdviceData = { swing, day, scalp };
   adviceTimeEl.textContent = `Bijgewerkt: ${new Date().toLocaleTimeString("nl-NL")}`;
 
-  adviceCardsSwingEl.innerHTML = (swing.setups ?? []).map(setupCardHtml).join("") || `<div class="advice-empty">Geen setup</div>`;
-  adviceCardsDayEl.innerHTML   = (day.setups   ?? []).map(setupCardHtml).join("") || `<div class="advice-empty">Geen setup</div>`;
-  adviceCardsScalpEl.innerHTML = (scalp.setups ?? []).map(setupCardHtml).join("") || `<div class="advice-empty">Geen setup</div>`;
+  adviceCardsSwingEl.innerHTML = (swing.setups ?? []).map((s, i) => setupCardHtml(s, "swing", i)).join("") || `<div class="advice-empty">Geen setup</div>`;
+  adviceCardsDayEl.innerHTML   = (day.setups   ?? []).map((s, i) => setupCardHtml(s, "day",   i)).join("") || `<div class="advice-empty">Geen setup</div>`;
+  adviceCardsScalpEl.innerHTML = (scalp.setups ?? []).map((s, i) => setupCardHtml(s, "scalp", i)).join("") || `<div class="advice-empty">Geen setup</div>`;
 
-  if (!candleSeries) return;
-  clearAdviceLines();
-  for (const setup of [...(day.setups ?? [])].slice(0, 1)) {
-    const isLong = setup.direction === "long";
-    adviceLines.push(
-      candleSeries.createPriceLine({ price: setup.entryPrice, color: "#ffffff", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, title: `Entry ${setup.direction}`, axisLabelVisible: true }),
-      candleSeries.createPriceLine({ price: setup.stopPrice, color: "#ff4040", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, title: "SL", axisLabelVisible: true }),
-      candleSeries.createPriceLine({ price: setup.tp1, color: isLong ? "#4cc9b0" : "#ff9966", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, title: "TP1", axisLabelVisible: false }),
-      candleSeries.createPriceLine({ price: setup.tp2, color: isLong ? "#4cc9b0" : "#ff9966", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted, title: "TP2", axisLabelVisible: false }),
-      candleSeries.createPriceLine({ price: setup.tp3, color: "#d6ff62", lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, title: "TP3", axisLabelVisible: true })
-    );
+  // Wire log-trade buttons (stop propagation so card click doesn't also fire)
+  adviceSectionEl.querySelectorAll(".log-trade-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const setup = _lastAdviceData[btn.dataset.style]?.setups?.[Number(btn.dataset.idx)];
+      if (setup) logTrade(setup, btn.dataset.style);
+    });
+  });
+
+  // Wire card clicks → show setup on chart
+  adviceSectionEl.querySelectorAll(".advice-card[data-style]").forEach(card => {
+    card.addEventListener("click", () => {
+      adviceSectionEl.querySelectorAll(".advice-card").forEach(c => c.classList.remove("active"));
+      card.classList.add("active");
+      const setup = _lastAdviceData[card.dataset.style]?.setups?.[Number(card.dataset.idx)];
+      drawSetupOnChart(setup);
+    });
+  });
+
+  // Auto-select highest-score setup on load
+  const allSetups = [
+    ...(day.setups   ?? []).map((s, i) => ({ s, style: "day",   i })),
+    ...(swing.setups ?? []).map((s, i) => ({ s, style: "swing", i })),
+    ...(scalp.setups ?? []).map((s, i) => ({ s, style: "scalp", i })),
+  ];
+  const best = allSetups.sort((a, b) => (b.s.score ?? 0) - (a.s.score ?? 0))[0];
+  if (best) {
+    const bestCard = adviceSectionEl.querySelector(`.advice-card[data-style="${best.style}"][data-idx="${best.i}"]`);
+    bestCard?.classList.add("active");
+    drawSetupOnChart(best.s);
   }
 }
 
@@ -1855,14 +1951,17 @@ function renderLevels(levels) {
   levelCountEl.textContent = String(levels.length);
   levelsListEl.innerHTML = levels
     .map((level) => {
-      const broken = level.active === false;
+      const broken  = level.active === false || level.broken === true;
+      const typeStr = level.type ?? level.role ?? "—";
+      const touches = level.touches ?? level.touchCount ?? 0;
+      const strength = level.strength ?? level.score ?? null;
       return `
         <div class="level-row${broken ? " invalidated" : ""}">
           <div>
             <strong>${formatPrice(level.price)}</strong>
-            <small>${level.type} · ${level.touches} touches${broken ? " · gebroken" : ""}</small>
+            <small>${typeStr} · ${touches} touches${broken ? " · gebroken" : ""}</small>
           </div>
-          <small>${level.strength.toFixed(1)}</small>
+          ${strength != null ? `<small>${strength.toFixed(1)}</small>` : ""}
         </div>
       `;
     })
@@ -1885,6 +1984,16 @@ function sortTrades(trades) {
 function renderTrades(trades) {
   lastTrades = trades;
   tradeCountEl.textContent = String(trades.length);
+
+  if (!trades.length) {
+    tradesBodyEl.innerHTML = `
+      <tr><td colspan="8" style="text-align:center;padding:20px 12px;color:var(--muted);line-height:1.6">
+        Geen trades gevonden met deze instellingen en lookback.<br>
+        <span style="font-size:12px">Vergroot de lookback, verlaag de volume-multiplier of level-tolerantie voorzichtig.</span>
+      </td></tr>`;
+    return;
+  }
+
   tradesBodyEl.innerHTML = sortTrades(trades)
     .map(
       (trade) => `

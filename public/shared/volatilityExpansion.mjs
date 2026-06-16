@@ -241,7 +241,7 @@ function simulateVolatilityExpansionTrades(candles, compressionBlocks, bias, con
         compressionBars: block.endIndex - block.startIndex + 1,
         compressionQuality,
         breakoutStrength,
-        volumeRatio,
+        volumeRatio: volRatio,
         bias,
         rr
       });
@@ -382,12 +382,16 @@ export function scanVolatilityExpansion({ entryCandles, levelCandles, candlesByR
     setups.push({
       direction,
       status,
-      entry,
-      stop,
+      entryPrice: entry,
+      stopPrice:  stop,
       tp1, tp2, tp3,
       rr,
       score,
-      description: `Compressie breakout · Range ${rangeLow.toLocaleString("nl-NL")}–${rangeHigh.toLocaleString("nl-NL")} · ${block.endIndex - block.startIndex + 1} 4H bars compressie · Bias ${bias}`
+      description: `Compressie breakout · Range ${rangeLow.toLocaleString("nl-NL")}–${rangeHigh.toLocaleString("nl-NL")} · ${block.endIndex - block.startIndex + 1} 4H bars compressie · Bias ${bias}`,
+      anchors: [
+        { label: `Compressie top (${block.endIndex - block.startIndex + 1} bars)`, price: rangeHigh, role: "entry-basis" },
+        { label: "Compressie bodem", price: rangeLow, role: "stop-basis" }
+      ]
     });
   }
 

@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Strategie Vergelijking — Trading Research</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { padding: 24px 32px; max-width: 1200px; margin: 0 auto; }
+    .back { display: inline-block; margin-bottom: 20px; font-size: 13px; color: var(--accent-2); text-decoration: none; }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--line, #2d3748);
+    }
+    .tab {
+      padding: 7px 14px;
+      border-radius: 6px 6px 0 0;
+      cursor: pointer;
+      color: var(--muted, #94a3b8);
+      font-weight: 500;
+      font-size: 12px;
+      transition: all .15s;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+    }
+    .tab:hover { color: var(--text, #e2e8f0); background: var(--surface-2, #1e2535); }
+    .tab.active { color: var(--accent-2, #63b3ed); border-bottom-color: var(--accent-2, #63b3ed); background: var(--surface, #1a2235); }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* STRATEGY TABLE */
+    .strat-grid {
+      display: grid;
+      grid-template-columns: 130px repeat(5, 1fr);
+      gap: 1px;
+      background: var(--line, #2d3748);
+      border: 1px solid var(--line, #2d3748);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .cell {
+      background: var(--surface, #131923);
+      padding: 8px 9px;
+      vertical-align: top;
+    }
+    .cell.header {
+      background: var(--surface-2, #0f1520);
+      font-weight: 700;
+      font-size: 11px;
+      color: var(--accent-2, #63b3ed);
+      text-align: center;
+      padding: 10px 6px;
+    }
+    .cell.row-label {
+      background: var(--bg, #0d1117);
+      font-weight: 600;
+      font-size: 11px;
+      color: var(--muted, #94a3b8);
+      display: flex;
+      align-items: flex-start;
+      padding-top: 10px;
+    }
+    .cell.header .strat-type {
+      font-size: 9px;
+      font-weight: 400;
+      color: var(--muted, #718096);
+      margin-top: 3px;
+    }
+    .tag {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      margin: 1px 1px 2px 0;
+    }
+    .tag.trend  { background: #1a4731; color: #4ade80; }
+    .tag.range  { background: #1a2e4a; color: #63b3ed; }
+    .tag.compression { background: #3b2e1a; color: #f6ad55; }
+    .tag.tf     { background: #1e2535; color: #94a3b8; }
+    .tag.signal { background: #1a1a3b; color: #b794f4; }
+    .tag.red    { background: #3b1a1a; color: #fc8181; }
+    .cell p     { font-size: 11px; color: var(--muted, #94a3b8); margin-bottom: 3px; }
+    .cell strong { color: var(--text, #e2e8f0); }
+
+    /* METRICS */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .metric-card {
+      background: var(--surface, #131923);
+      border: 1px solid var(--line, #2d3748);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .metric-card.full { grid-column: 1 / -1; }
+    .metric-card.highlight { border-color: #e53e3e; }
+    .metric-card.good-card { border-color: #48bb78; }
+    .metric-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted, #94a3b8);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 4px;
+    }
+    .metric-value { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+    .metric-value.red   { color: #fc8181; }
+    .metric-value.green { color: #68d391; }
+    .metric-value.white { color: var(--text, #e2e8f0); }
+    .metric-explain { font-size: 11px; color: var(--muted, #94a3b8); line-height: 1.5; }
+    .metric-explain strong { color: var(--text, #e2e8f0); }
+    .verdict {
+      margin-top: 6px;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+    .verdict.bad  { background: #3b1a1a; color: #fc8181; }
+    .verdict.ok   { background: #3b3b1a; color: #f6e05e; }
+    .verdict.good { background: #1a3b2e; color: #68d391; }
+    .formula-box {
+      background: var(--bg, #0d1117);
+      border: 1px solid var(--line, #2d3748);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #b794f4;
+      margin-top: 8px;
+    }
+
+    /* FINETUNING */
+    .tune-section { margin-bottom: 20px; }
+    .tune-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-2, #63b3ed);
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--line, #2d3748);
+    }
+    .tune-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 6px;
+      align-items: flex-start;
+    }
+    .tune-strat {
+      min-width: 180px;
+      font-weight: 600;
+      color: var(--text, #e2e8f0);
+      font-size: 11px;
+    }
+    .tune-tip { font-size: 11px; color: var(--muted, #94a3b8); flex: 1; }
+    .tune-tip strong { color: var(--text, #e2e8f0); }
+    .info-box {
+      background: var(--surface, #131923);
+      border: 1px solid var(--line, #2d3748);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 11px;
+      color: var(--muted, #94a3b8);
+      line-height: 1.8;
+    }
+    .info-box strong { color: var(--text, #e2e8f0); }
+    .accent { color: var(--accent-2, #63b3ed); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <a class="back" href="javascript:history.back()">← Terug</a>
+  <h1>Strategie Vergelijking</h1>
+  <p class="subtitle">Alle 5 strategieën naast elkaar · Metrics leeswijzer · Fine-tuning stappenplan</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="show('strat', this)">Strategieën vergelijking</button>
+    <button class="tab" onclick="show('metrics', this)">Metrics leeswijzer</button>
+    <button class="tab" onclick="show('tune', this)">Fine-tuning over tijd</button>
+  </div>
+
+  <!-- PANEL 1: STRATEGIE VERGELIJKING -->
+  <div id="strat" class="panel active">
+    <div class="strat-grid">
+      <div class="cell row-label"></div>
+      <div class="cell header">S/R v1<div class="strat-type">Reversal / Range</div></div>
+      <div class="cell header">Doopiecash NPA<div class="strat-type">Price Action</div></div>
+      <div class="cell header">SMC-lite<div class="strat-type">Liquiditeit</div></div>
+      <div class="cell header">Trend Pullback<div class="strat-type">Continuation</div></div>
+      <div class="cell header">Volatility Exp.<div class="strat-type">Breakout</div></div>
+
+      <div class="cell row-label">Waar kijkt het naar?</div>
+      <div class="cell"><p>HTF swing-pivots: price zones met meerdere touches worden support/resistance</p><span class="tag tf">4h pivots</span><span class="tag tf">1D niveaus</span></div>
+      <div class="cell"><p>Maandelijkse + dagelijkse bias → 4H zone → 15m trigger → 3m sniper</p><span class="tag tf">4 timeframes</span><span class="tag signal">bias + score</span></div>
+      <div class="cell"><p>Liquiditeitspools: equal highs/lows, prev-day/week high/low, range extremen</p><span class="tag tf">15m–1D</span><span class="tag signal">sweep + reclaim</span></div>
+      <div class="cell"><p>Daily EMA50 + swing-structuur (HH-HL vs LH-LL), pullback naar 4H Higher Lows</p><span class="tag tf">1D + 4h</span><span class="tag signal">EMA + structuur</span></div>
+      <div class="cell"><p>ATR-percentiel op 4H: detecteert compressie (lage ATR) voor de breakout</p><span class="tag tf">4h ATR</span><span class="tag signal">volume expansie</span></div>
+
+      <div class="cell row-label">Waarop reageert het?</div>
+      <div class="cell"><p>Retest van bekende zone met bevestiging (volume of wick-rejection)</p><span class="tag range">Range / zijwaarts</span></div>
+      <div class="cell"><p>Samenkomst van bias, zone-kwaliteit én 15m trigger-candle (score ≥ 70/130)</p><span class="tag trend">Trend + confluent</span></div>
+      <div class="cell"><p>Sweep van liquiditeit gevolgd door reclaim binnen 5 bars + CHOCH/BOS</p><span class="tag signal">Stop-runs</span><span class="tag trend">Trend</span></div>
+      <div class="cell"><p>Terugval naar HL-zone in opwaartse trend of LH-zone in neerwaartse trend</p><span class="tag trend">Trending markt</span></div>
+      <div class="cell"><p>Uitbraak boven/onder compressierange met volume-bevestiging</p><span class="tag compression">Compressie → expansie</span></div>
+
+      <div class="cell row-label">Hoe acteert het?</div>
+      <div class="cell"><p>Entry op retest van zone, stop onder swing-low (long) of boven swing-high (short)</p><p>TP1 = 1×R, TP2 = 2×R, TP3 = eerste weerstand</p></div>
+      <div class="cell"><p>Entry via 3m sniper-candle op rejection van 15m trigger-zone</p><p>Wick-fill targets bij rejection. Geeft expliciete setup-uitleg per trade</p></div>
+      <div class="cell"><p>Entry na CHOCH/BOS-bevestiging, stop boven/onder sweep-wick extreme</p><p>Drie entry-modellen: balanced / conservative / aggressive</p></div>
+      <div class="cell"><p>Entry op HL-zone test, stop onder HL-zone, partial exits op TP1/TP2/TP3</p><p>Rijdt mee met bestaande trend, niet de wending</p></div>
+      <div class="cell"><p>Entry op retested breakout-niveau, stop onder range-boundary</p><p>Hoge R maar lage trefkans; weinig trades</p></div>
+
+      <div class="cell row-label">Beste markt­omgeving</div>
+      <div class="cell"><span class="tag range">Range / zijwaarts</span><br><br><p>Werkt NIET in sterke trend</p><span class="tag red">❌ Trend</span></div>
+      <div class="cell"><span class="tag trend">Trending</span><span class="tag range">Ranging</span><br><br><p>Werkt overal mits score hoog</p><span class="tag red">❌ Chop</span></div>
+      <div class="cell"><span class="tag trend">Trending</span><br><br><p>Vereist duidelijke swing-structuur</p><span class="tag red">❌ Range</span></div>
+      <div class="cell"><span class="tag trend">Sterke trend</span><br><br><p>Doet niks in range/chop</p><span class="tag red">❌ Range</span><span class="tag red">❌ Chop</span></div>
+      <div class="cell"><span class="tag compression">Na compressie</span><br><br><p>Alleen bij lage ATR vooraf</p><span class="tag red">❌ Al trending</span></div>
+
+      <div class="cell row-label">Score drempel</div>
+      <div class="cell"><p>Geen expliciete score. Niveau-kwaliteit via touch-count en volume</p></div>
+      <div class="cell"><span class="tag signal">Min. 70/130</span><p>Strikte scoring: bias, zone, trigger, candle, wick, time</p></div>
+      <div class="cell"><span class="tag signal">Min. 65</span><p>Sweep kwaliteit, reclaim-snelheid, CHOCH-sterkte</p></div>
+      <div class="cell"><p>EMA50 positie + swing-structuur vereist. Geen expliciete score</p></div>
+      <div class="cell"><p>ATR-percentiel drempel + volume-multiplier. Geen score</p></div>
+    </div>
+  </div>
+
+  <!-- PANEL 2: METRICS LEESWIJZER -->
+  <div id="metrics" class="panel">
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Uitleg van alle metrics in het backtest-resultatenblok. Let op: onderstaande getallen zijn <strong style="color:var(--text)">voorbeeldwaarden</strong> — jouw actuele backtest kan andere getallen tonen.</p>
+    <div class="metrics-grid">
+
+      <div class="metric-card">
+        <div class="metric-name">Trades</div>
+        <div class="metric-value white">274</div>
+        <div class="metric-explain">Aantal backtested signalen in de geselecteerde periode. <strong>274 is veel</strong> voor een swing-strategie (normaal 30–80) — controleer lookback-periode en of richting op "beide" staat. Meer trades → kosten eten meer R op.</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-name">Winrate</div>
+        <div class="metric-value white">38.3%</div>
+        <div class="metric-explain">Percentage trades dat een TP raakt. <strong>38% is laag maar niet onrealistisch</strong> — reversal-strategieën draaien op 35–45%. Acceptabel <em>als</em> de R per winnaar hoog genoeg is (profit factor > 1.5). Hier nog niet het geval.</div>
+      </div>
+
+      <div class="metric-card highlight">
+        <div class="metric-name">Profit Factor</div>
+        <div class="metric-value red">0.4</div>
+        <div class="metric-explain">Bruto-winst ÷ bruto-verlies. <strong>Alles onder 1.0 = netto verliezend.</strong> 0.4 betekent: voor elke euro gewonnen, ging €2.50 verloren. Doel is ≥ 1.5 netto, ≥ 1.2 minimaal.</div>
+        <div class="metric-explain"><span class="verdict bad">❌ Slecht — optimaliseer parameters</span></div>
+      </div>
+
+      <div class="metric-card good-card">
+        <div class="metric-name">Gross R</div>
+        <div class="metric-value green">85.77</div>
+        <div class="metric-explain">Totaal verdiend R uit winnende trades, <em>vóór</em> kosten. Groen = de strategie vindt wel winnaars. 85.77R over 274 trades ≈ 0.32R per winnaar × 105 winnaars.</div>
+      </div>
+
+      <div class="metric-card highlight">
+        <div class="metric-name">Kosten R</div>
+        <div class="metric-value red">211.88</div>
+        <div class="metric-explain"><strong>Hoofdverdachte.</strong> Fee + slippage per kant × aantal trades. Kosten zijn hier <em>groter</em> dan de bruto-winst. Controleer fee % en slippage in "Executiekosten &amp; realisme". Deribit taker: ~0.05%.</div>
+        <div class="metric-explain"><span class="verdict bad">⚠ Kosten > Gross R — stel fees lager in</span></div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-name">Funding R</div>
+        <div class="metric-value white">0</div>
+        <div class="metric-explain">Fundingkosten voor perpetuals (per 8u). 0 = funding staat uit of alle trades duurden &lt; 8u. Voor swing-trades is funding relevant — stel bijv. 0.01% per 8u in voor een realistischer beeld.</div>
+      </div>
+
+      <div class="metric-card highlight full">
+        <div class="metric-name">Net R</div>
+        <div class="metric-value red">−126.11</div>
+        <div class="metric-explain">
+          <strong>Het eindresultaat.</strong> Gross R − Kosten R − Funding R.
+          <div class="formula-box">85.77 − 211.88 − 0 = −126.11 R</div>
+          Vertaalt naar euros via: Net R × risicobudget per trade. Bij €50 risico per trade = −€6.305 over de periode. Bij realistische lage fees zou dit positief kunnen zijn.
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-name">Avg R</div>
+        <div class="metric-value red">−0.46</div>
+        <div class="metric-explain">Net R ÷ aantal trades. <strong>−0.46R per trade gemiddeld.</strong> Positief doelgetal is ≥ +0.2R. Volledig gedreven door de hoge kostenstructuur in dit voorbeeld.</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-name">Avg Score</div>
+        <div class="metric-value white">76.3</div>
+        <div class="metric-explain">Gemiddelde setup-kwaliteitsscore over alle trades. <strong>76 is acceptabel</strong> (min. drempel is 70). Verhoog min. score naar 80–85 om alleen de betere setups te handelen — minder trades, lagere kosten.</div>
+        <div class="metric-explain"><span class="verdict ok">→ Probeer min. score 80</span></div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-name">Max DD R</div>
+        <div class="metric-value white">130.73</div>
+        <div class="metric-explain"><strong>Maximale drawdown</strong> — de grootste daling van equity-piek naar dal, uitgedrukt in R. Bij €50/trade = €6.535 max verliesperiode. Als dit groter is dan je risicobudget: verklein positiegrootte.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PANEL 3: FINETUNING -->
+  <div id="tune" class="panel">
+    <div class="tune-section">
+      <div class="tune-title">Universele finetuning-stappen (voor elke strategie)</div>
+      <div class="info-box">
+        <strong>1. Kosten eerst instellen</strong> — Stel fee/slippage op realistische waarden (Deribit taker: 0.05%). Zo weet je of een strategie werkt <em>na</em> kosten.<br>
+        <strong>2. Lookback kiezen</strong> — Korter (30d) = recente condities; langer (180d) = robuustheid. Gebruik walkforward om te checken of de IS-piek ook OOS standhoudt.<br>
+        <strong>3. OOS-ratio bewaken</strong> — OOS R / IS R. Onder 50% = overfitting. Optimaliseer tot dit boven 70% zit.<br>
+        <strong>4. Min. trades ≥ 30</strong> — Minder dan 30 trades = statistisch niet betrouwbaar. Vergroot lookback of verlaag drempels als je te weinig trades ziet.<br>
+        <strong>5. Regime koppelen</strong> — Gebruik "Welke strategie nu?" om alleen te backtesten in het regime waarvoor de strategie bedoeld is.
+      </div>
+    </div>
+
+    <div class="tune-section">
+      <div class="tune-title">Per strategie: belangrijkste hefbomen</div>
+      <div class="info-box" style="line-height:2;">
+        <div class="tune-row">
+          <div class="tune-strat">S/R v1</div>
+          <div class="tune-tip"><strong>Volume multiplier</strong> (filtert zwakke levels) + <strong>level tolerantie</strong> (zone-breedte). Begin met vol. multiplier 1.5–2.0. Gebruik "Optimaliseer" grid search.</div>
+        </div>
+        <div class="tune-row">
+          <div class="tune-strat">Doopiecash NPA</div>
+          <div class="tune-tip"><strong>Min. score drempel</strong> is de sterkste hefboom — verhoog van 70 naar 80 of 90 en kijk hoeveel trades er overblijven. Min. score 85+ geeft minder maar hogere-kwaliteit setups.</div>
+        </div>
+        <div class="tune-row">
+          <div class="tune-strat">SMC-lite</div>
+          <div class="tune-tip"><strong>Entry-model</strong> (balanced / conservative / aggressive) bepaalt hoe snel na de CHOCH je instapt. Conservative = minder trades, betere R. Reclaim-window standaard 5 bars.</div>
+        </div>
+        <div class="tune-row">
+          <div class="tune-strat">Trend Pullback</div>
+          <div class="tune-tip"><strong>Richting</strong> (long/short/beide): in sterke bull market alleen long. Combineer altijd met Regime Decision — alleen gebruiken bij Trend-regime.</div>
+        </div>
+        <div class="tune-row">
+          <div class="tune-strat">Volatility Expansion</div>
+          <div class="tune-tip"><strong>ATR-percentiel drempel</strong>: hoe laag moet ATR zijn voor compressie. <strong>Volume multiplier</strong> voor breakout-bevestiging. Weinig trades verwacht — gebruik lookback 180d.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tune-section">
+      <div class="tune-title">Iteratief finetunen: het stappenplan</div>
+      <div class="info-box">
+        <span class="accent">Week 1–2:</span> Alle 5 strategieën draaien op 90d lookback, realistische fees, richting = beide. Noteer welke Net R &gt; 0 heeft.<br>
+        <span class="accent">Week 3–4:</span> Voor winnende strategieën: Optimaliseer-knop gebruiken, OOS-ratio controleren. Ga naar 180d lookback om te zien of het standhoudt.<br>
+        <span class="accent">Maandelijks:</span> Regime checken via "Welke strategie nu?" en strategie wisselen als het regime draait. Vergelijk presets van vorige maand.<br>
+        <span class="accent">Elk kwartaal:</span> Equity curve bekijken — zijn er periodes met clusters van verlies? Kijk naar Monte Carlo P5 scenario voor worst-case risicobudget.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function show(id, btn) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      btn.classList.add('active');
+    }
+  </script>
+</body>
+</html>

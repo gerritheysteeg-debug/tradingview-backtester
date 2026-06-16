@@ -421,7 +421,9 @@ export function scanSupportResistance({ entryCandles, levelCandles, options = {}
     const stopRef = supports[1]?.price ?? level.price * (1 - 1.0 / 100);
     const stop = round(stopRef * (1 - config.stopBufferPct / 100), 1);
     const risk = level.price - stop;
-    const tp3 = resistances[0]?.price ?? level.price + risk * 3;
+    // TP3: nearest resistance above entry, but must be above TP2 — otherwise use 3× risk fallback
+    const rawTp3Long = resistances[0]?.price ?? level.price + risk * 3;
+    const tp3 = rawTp3Long > level.price + risk * 2 ? rawTp3Long : level.price + risk * 3;
     const dist = round((currentPrice - level.price) / currentPrice * 100, 2);
     const proximity = (currentPrice - level.price) / tol;
     if (risk > 0) {
@@ -436,7 +438,12 @@ export function scanSupportResistance({ entryCandles, levelCandles, options = {}
         score: Math.min(100, Math.round(level.strength * 8)),
         rr: round((tp3 - level.price) / risk, 2),
         description: `${level.type} · ${level.touches} touches`,
-        distance: `${dist}% onder prijs`
+        distance: `${dist}% onder prijs`,
+        anchors: [
+          { label: `${level.type} entry (${level.touches}×)`, price: level.price, role: "entry-basis" },
+          { label: supports[1] ? `Stop basis: ${supports[1].type} (${supports[1].touches}×)` : "Stop: vaste buffer 1%", price: stopRef, role: "stop-basis" },
+          resistances[0] ? { label: `TP basis: ${resistances[0].type} (${resistances[0].touches}×)`, price: resistances[0].price, role: "tp-basis" } : null
+        ].filter(Boolean)
       });
     }
   }
@@ -447,7 +454,9 @@ export function scanSupportResistance({ entryCandles, levelCandles, options = {}
     const stopRef = resistances[1]?.price ?? level.price * (1 + 1.0 / 100);
     const stop = round(stopRef * (1 + config.stopBufferPct / 100), 1);
     const risk = stop - level.price;
-    const tp3 = supports[0]?.price ?? level.price - risk * 3;
+    // TP3: nearest support below entry, but must be below TP2 — otherwise use 3× risk fallback
+    const rawTp3Short = supports[0]?.price ?? level.price - risk * 3;
+    const tp3 = rawTp3Short < level.price - risk * 2 ? rawTp3Short : level.price - risk * 3;
     const dist = round((level.price - currentPrice) / currentPrice * 100, 2);
     const proximity = (level.price - currentPrice) / tol;
     if (risk > 0) {
@@ -462,7 +471,12 @@ export function scanSupportResistance({ entryCandles, levelCandles, options = {}
         score: Math.min(100, Math.round(level.strength * 8)),
         rr: round((level.price - tp3) / risk, 2),
         description: `${level.type} · ${level.touches} touches`,
-        distance: `${dist}% boven prijs`
+        distance: `${dist}% boven prijs`,
+        anchors: [
+          { label: `${level.type} entry (${level.touches}×)`, price: level.price, role: "entry-basis" },
+          { label: resistances[1] ? `Stop basis: ${resistances[1].type} (${resistances[1].touches}×)` : "Stop: vaste buffer 1%", price: stopRef, role: "stop-basis" },
+          supports[0] ? { label: `TP basis: ${supports[0].type} (${supports[0].touches}×)`, price: supports[0].price, role: "tp-basis" } : null
+        ].filter(Boolean)
       });
     }
   }

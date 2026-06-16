@@ -671,7 +671,8 @@ export function scanDoopiecashNakedPriceAction({ entryCandles, levelCandles, can
     const stopRef = supports[1]?.price ?? zone.price * (1 - 0.7 / 100);
     const stop = round(stopRef * (1 - config.stopBufferPct / 100), 1);
     const risk = zone.price - stop;
-    const tp3 = resistances[0]?.price ?? zone.price + risk * 3;
+    const rawTp3L = resistances[0]?.price ?? zone.price + risk * 3;
+    const tp3 = rawTp3L > zone.price + risk * 2 ? rawTp3L : zone.price + risk * 3;
     const biasScore = (dailyBias === "long" ? 35 : dailyBias === "neutral" ? 15 : 0) + (weeklyBias === "long" ? 20 : weeklyBias === "neutral" ? 10 : 0);
     const dist = round((currentPrice - zone.price) / currentPrice * 100, 2);
     const proximity = (currentPrice - zone.price) / tol;
@@ -699,7 +700,8 @@ export function scanDoopiecashNakedPriceAction({ entryCandles, levelCandles, can
     const stopRef = resistances[1]?.price ?? zone.price * (1 + 0.7 / 100);
     const stop = round(stopRef * (1 + config.stopBufferPct / 100), 1);
     const risk = stop - zone.price;
-    const tp3 = supports[0]?.price ?? zone.price - risk * 3;
+    const rawTp3S = supports[0]?.price ?? zone.price - risk * 3;
+    const tp3 = rawTp3S < zone.price - risk * 2 ? rawTp3S : zone.price - risk * 3;
     const biasScore = (dailyBias === "short" ? 35 : dailyBias === "neutral" ? 15 : 0) + (weeklyBias === "short" ? 20 : weeklyBias === "neutral" ? 10 : 0);
     const dist = round((zone.price - currentPrice) / currentPrice * 100, 2);
     const proximity = (zone.price - currentPrice) / tol;

@@ -9,7 +9,7 @@ import {
   SUPPORTED_RESOLUTIONS
 } from "./deribit.mjs";
 import {
-  getStrategy,
+  findStrategy,
   listStrategies,
   runStrategyBacktest,
   scanStrategy
@@ -110,7 +110,7 @@ async function handleApi(request, response) {
     const body = await readJsonRequest(request);
     const instrumentName = body.instrumentName ?? "BTC-PERPETUAL";
     const strategyId = body.strategyId ?? "support-resistance-v1";
-    const strategy = getStrategy(strategyId);
+    const strategy = findStrategy(strategyId);
     if (!strategy) {
       sendJson(response, 400, { error: `Onbekende strategie: ${strategyId}` });
       return;
@@ -170,7 +170,7 @@ async function handleApi(request, response) {
     let options = {};
     try { options = JSON.parse(url.searchParams.get("options") ?? "{}"); } catch {}
 
-    const strategy = getStrategy(strategyId);
+    const strategy = findStrategy(strategyId);
     if (!strategy) {
       sendJson(response, 400, { error: `Onbekende strategie: ${strategyId}` });
       return;
@@ -237,7 +237,7 @@ async function handleApi(request, response) {
     const body = await readJsonRequest(request);
     const instrumentName = body.instrumentName ?? "BTC-PERPETUAL";
     const strategyId     = body.strategyId ?? "support-resistance-v1";
-    const strategy = getStrategy(strategyId);
+    const strategy = findStrategy(strategyId);
     if (!strategy) {
       sendJson(response, 400, { error: `Onbekende strategie: ${strategyId}` });
       return;
@@ -246,14 +246,15 @@ async function handleApi(request, response) {
     const lookbackDays = Number.isFinite(rawLookback) && rawLookback > 0 ? rawLookback : 90;
     const oosPct       = Math.min(50, Math.max(5, Number(body.outOfSamplePct ?? 20)));
     const paramGrid    = body.paramGrid ?? {};
+    const validDimensions = Object.keys(paramGrid).filter(k => Array.isArray(paramGrid[k]) && paramGrid[k].length > 0);
+    if (!validDimensions.length) {
+      sendJson(response, 400, { error: "Selecteer minimaal één parameterwaarde per dimensie." });
+      return;
+    }
 
     const combos = cartesianProduct(paramGrid);
     if (combos.length > 200) {
       sendJson(response, 400, { error: `Te veel combinaties: ${combos.length}. Maximum is 200.` });
-      return;
-    }
-    if (!combos.length) {
-      sendJson(response, 400, { error: "Selecteer minimaal één parameterwaarde per dimensie." });
       return;
     }
 

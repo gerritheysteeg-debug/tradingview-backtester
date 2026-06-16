@@ -355,12 +355,16 @@ export function scanTrendPullback({ entryCandles, levelCandles, candlesByResolut
     setups.push({
       direction: dir,
       status,
-      entry,
-      stop,
+      entryPrice: entry,
+      stopPrice:  stop,
       tp1, tp2, tp3,
       rr,
       score,
-      description: `Trend pullback naar 4H HL zone @ ${zone.price.toLocaleString("nl-NL")} · ${trend.direction === "long" ? "Daily bullish" : "Daily bearish"} trend · ${distPct.toFixed(1)}% van entry`
+      description: `Trend pullback naar 4H HL zone @ ${zone.price.toLocaleString("nl-NL")} · ${trend.direction === "long" ? "Daily bullish" : "Daily bearish"} trend · ${distPct.toFixed(1)}% van entry`,
+      anchors: [
+        { label: `4H HL zone top @ ${zone.high.toLocaleString("nl-NL")}`, price: zone.high, role: "entry-basis" },
+        { label: `4H HL zone bodem @ ${zone.low.toLocaleString("nl-NL")}`, price: zone.low,  role: "stop-basis"  }
+      ]
     });
   }
 

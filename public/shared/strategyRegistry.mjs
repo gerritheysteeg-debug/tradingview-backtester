@@ -69,15 +69,19 @@ export function listStrategies() {
   }));
 }
 
+// Strict lookup — returns undefined for unknown strategyId (use in server validation)
+export function findStrategy(strategyId) {
+  return STRATEGIES.find((s) => s.id === strategyId);
+}
+
+// Lenient lookup with fallback to first strategy — use only for UI defaults
 export function getStrategy(strategyId = "support-resistance-v1") {
-  return (
-    STRATEGIES.find((strategy) => strategy.id === strategyId) ??
-    STRATEGIES[0]
-  );
+  return findStrategy(strategyId) ?? STRATEGIES[0];
 }
 
 export function scanStrategy({ strategyId, entryCandles, levelCandles, candlesByResolution = {}, options = {} }) {
-  const strategy = getStrategy(strategyId);
+  const strategy = findStrategy(strategyId);
+  if (!strategy) throw new Error(`Onbekende strategie: ${strategyId}`);
   if (!strategy.scan) return { setups: [], currentPrice: 0 };
   return strategy.scan({ entryCandles, levelCandles, candlesByResolution, options });
 }
@@ -89,7 +93,8 @@ export function runStrategyBacktest({
   candlesByResolution = {},
   options = {}
 }) {
-  const strategy = getStrategy(strategyId);
+  const strategy = findStrategy(strategyId);
+  if (!strategy) throw new Error(`Onbekende strategie: ${strategyId}`);
   const result = strategy.run({ entryCandles, levelCandles, candlesByResolution, options });
 
   // Walk-forward: split trades into in-sample (IS) and out-of-sample (OOS) by entry time.

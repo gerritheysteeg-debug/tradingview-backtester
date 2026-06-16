@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  findStrategy,
   getStrategy,
   listStrategies,
   runStrategyBacktest
@@ -120,4 +121,29 @@ test("doopiecash strategy can run through dispatcher", () => {
   assert.equal(Array.isArray(result.levels), true);
   assert.equal(Array.isArray(result.trades), true);
   assert.equal(typeof result.metrics.averageScore, "number");
+});
+
+test("findStrategy returns undefined for unknown strategy id", () => {
+  assert.equal(findStrategy("invalid-strategy-id"), undefined);
+  assert.equal(findStrategy(""), undefined);
+  assert.equal(findStrategy("support-resistance-v99"), undefined);
+});
+
+test("findStrategy returns strategy for valid ids", () => {
+  const s = findStrategy("support-resistance-v1");
+  assert.equal(s?.id, "support-resistance-v1");
+  assert.equal(typeof s?.run, "function");
+  assert.equal(typeof s?.scan, "function");
+});
+
+test("getStrategy falls back to first strategy for unknown id (UI default behavior)", () => {
+  const fallback = getStrategy("nonexistent");
+  assert.equal(fallback?.id, "support-resistance-v1");
+});
+
+test("runStrategyBacktest throws for unknown strategy id", () => {
+  assert.throws(
+    () => runStrategyBacktest({ strategyId: "bogus-strategy", entryCandles: [], levelCandles: [] }),
+    /Onbekende strategie/
+  );
 });
