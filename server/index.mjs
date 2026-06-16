@@ -33,13 +33,16 @@ function sendJson(response, status, body) {
   response.end(JSON.stringify(body));
 }
 
-async function readJsonRequest(request) {
+async function safeReadJson(request) {
   const chunks = [];
-  for await (const chunk of request) {
-    chunks.push(chunk);
-  }
+  for await (const chunk of request) chunks.push(chunk);
   const raw = Buffer.concat(chunks).toString("utf-8");
-  return raw ? JSON.parse(raw) : {};
+  if (!raw) return { ok: true, value: {} };
+  try {
+    return { ok: true, value: JSON.parse(raw) };
+  } catch {
+    return { ok: false, error: "Ongeldige JSON in request body" };
+  }
 }
 
 function parseQuery(request) {
@@ -56,6 +59,52 @@ function cartesianProduct(grid) {
   const [first, ...rest] = keys;
   const restProduct = cartesianProduct(Object.fromEntries(rest.map(k => [k, grid[k]])));
   return grid[first].flatMap(val => restProduct.map(combo => ({ [first]: val, ...combo })));
+}
+
+/**
+ * Beoordeelt de kwaliteit van ontvangen candle-data per timeframe.
+ * status "ok"           → alle vereiste timeframes hebben voldoende data
+ * status "incomplete"   → niet-kritieke timeframes missen data
+ * status "insufficient" → een of meer kritieke timeframes ontbreken; advies onbetrouwbaar
+ */
+function buildDataQuality(candlesByResolution, requiredResolutions, criticalResolutions) {
+  const warnings = [];
+  const candleCounts = {};
+  const failedTimeframes = [];
+
+  for (const res of requiredResolutions) {
+    const count = candlesByResolution[res]?.length ?? 0;
+    candleCounts[res] = count;
+    if (count === 0) {
+      failedTimeframes.push(res);
+      warnings.push(`Geen candles ontvangen voor ${res}`);
+    } else if (count < 10) {
+      warnings.push(`Weinig candles voor ${res}: ${count} (mogelijk incomplete data)`);
+    }
+  }
+
+  const criticalFailed = criticalResolutions.filter(
+    r => (candlesByResolution[r]?.length ?? 0) === 0
+  );
+
+  let status;
+  if (criticalFailed.length > 0) {
+    status = "insufficient";
+    warnings.unshift(
+      `Kritieke timeframes ontbreken: ${criticalFailed.join(", ")} — advies niet betrouwbaar`
+    );
+  } else if (failedTimeframes.length > 0) {
+    status = "incomplete";
+  } else {
+    status = "ok";
+  }
+
+  return { status, warnings, candleCounts, failedTimeframes };
+}
+
+function parseLookbackDays(raw, fallback) {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
 async function handleApi(request, response) {
@@ -91,23 +140,40 @@ async function handleApi(request, response) {
   }
 
   if (url.pathname === "/api/candles") {
-    const instrumentName = url.searchParams.get("instrument") ?? "BTC-PERPETUAL";
+    const instrumentName = (url.searchParams.get("instrument") ?? "").trim();
     const resolution = url.searchParams.get("resolution") ?? "15m";
-    const lookbackDays = Number(url.searchParams.get("lookbackDays") ?? 30);
+    const rawLookback = url.searchParams.get("lookbackDays");
+
+    if (!instrumentName) {
+      sendJson(response, 400, { error: "Parameter 'instrument' is verplicht en mag niet leeg zijn." });
+      return;
+    }
+    if (!SUPPORTED_RESOLUTIONS.includes(resolution)) {
+      sendJson(response, 400, {
+        error: `Ongeldige resolution: "${resolution}". Geldige waarden: ${SUPPORTED_RESOLUTIONS.join(", ")}`
+      });
+      return;
+    }
+    const lookbackDays = Number(rawLookback ?? 30);
+    if (!Number.isFinite(lookbackDays) || lookbackDays <= 0) {
+      sendJson(response, 400, {
+        error: `Ongeldige lookbackDays: "${rawLookback}". Moet een positief getal zijn.`
+      });
+      return;
+    }
+
     const endTimestamp = nowMs();
     const startTimestamp = endTimestamp - lookbackDays * 24 * 60 * 60 * 1000;
-    const candles = await getCandles({
-      instrumentName,
-      resolution,
-      startTimestamp,
-      endTimestamp
-    });
+    const candles = await getCandles({ instrumentName, resolution, startTimestamp, endTimestamp });
     sendJson(response, 200, { candles });
     return;
   }
 
   if (url.pathname === "/api/backtest" && request.method === "POST") {
-    const body = await readJsonRequest(request);
+    const parsed = await safeReadJson(request);
+    if (!parsed.ok) { sendJson(response, 400, { error: parsed.error }); return; }
+    const body = parsed.value;
+
     const instrumentName = body.instrumentName ?? "BTC-PERPETUAL";
     const strategyId = body.strategyId ?? "support-resistance-v1";
     const strategy = findStrategy(strategyId);
@@ -115,12 +181,9 @@ async function handleApi(request, response) {
       sendJson(response, 400, { error: `Onbekende strategie: ${strategyId}` });
       return;
     }
-    const entryResolution =
-      strategy.chartResolution ?? body.entryResolution ?? "15m";
-    const levelResolution =
-      strategy.levelResolution ?? body.levelResolution ?? "4h";
-    const rawLookback = Number(body.lookbackDays ?? 90);
-    const lookbackDays = Number.isFinite(rawLookback) && rawLookback > 0 ? rawLookback : 90;
+    const entryResolution = strategy.chartResolution ?? body.entryResolution ?? "15m";
+    const levelResolution = strategy.levelResolution ?? body.levelResolution ?? "4h";
+    const lookbackDays = parseLookbackDays(body.lookbackDays, 90);
     const endTimestamp = nowMs();
     const startTimestamp = endTimestamp - lookbackDays * 24 * 60 * 60 * 1000;
     const requiredResolutions = strategy.requiredResolutions?.length
@@ -165,8 +228,7 @@ async function handleApi(request, response) {
   if (url.pathname === "/api/next-entry" && request.method === "GET") {
     const instrumentName = url.searchParams.get("instrument") ?? "BTC-PERPETUAL";
     const strategyId = url.searchParams.get("strategy") ?? "support-resistance-v1";
-    const rawLookback = Number(url.searchParams.get("lookbackDays") ?? 90);
-    const lookbackDays = Number.isFinite(rawLookback) && rawLookback > 0 ? rawLookback : 90;
+    const lookbackDays = parseLookbackDays(url.searchParams.get("lookbackDays"), 90);
     let options = {};
     try { options = JSON.parse(url.searchParams.get("options") ?? "{}"); } catch {}
 
@@ -184,68 +246,102 @@ async function handleApi(request, response) {
       ? strategy.requiredResolutions
       : [...new Set([entryResolution, levelResolution])];
 
+    const settledCandles = await Promise.allSettled(
+      requiredResolutions.map(async (resolution) => [
+        resolution,
+        await getCandles({ instrumentName, resolution, startTimestamp, endTimestamp })
+      ])
+    );
     const candlesByResolution = Object.fromEntries(
-      (await Promise.allSettled(
-        requiredResolutions.map(async (resolution) => [
-          resolution,
-          await getCandles({ instrumentName, resolution, startTimestamp, endTimestamp })
-        ])
-      ))
-        .filter(r => r.status === "fulfilled")
-        .map(r => r.value)
+      settledCandles.filter(r => r.status === "fulfilled").map(r => r.value)
+    );
+
+    const dataQuality = buildDataQuality(
+      candlesByResolution,
+      requiredResolutions,
+      [entryResolution]
     );
 
     const entryCandles = candlesByResolution[entryResolution] ?? [];
     const levelCandles = candlesByResolution[levelResolution] ?? [];
 
     const result = scanStrategy({ strategyId, entryCandles, levelCandles, candlesByResolution, options });
-    sendJson(response, 200, { instrumentName, strategyId, updatedAt: Date.now(), ...result });
+
+    if ((result.currentPrice ?? 0) === 0) {
+      dataQuality.warnings.push("Huidige prijs is 0 — mogelijk geen verbinding met dataprovider");
+      if (dataQuality.status === "ok") dataQuality.status = "incomplete";
+    }
+
+    sendJson(response, 200, {
+      instrumentName,
+      strategyId,
+      updatedAt: Date.now(),
+      dataQuality,
+      ...result
+    });
     return;
   }
 
   if (url.pathname === "/api/regime-decision" && request.method === "GET") {
     const instrumentName = url.searchParams.get("instrument") ?? "BTC-PERPETUAL";
-    const rawLookback    = Number(url.searchParams.get("lookbackDays") ?? 90);
-    const lookbackDays   = Number.isFinite(rawLookback) && rawLookback > 0 ? rawLookback : 90;
+    const lookbackDays = parseLookbackDays(url.searchParams.get("lookbackDays"), 90);
     let options = {};
     try { options = JSON.parse(url.searchParams.get("options") ?? "{}"); } catch {}
 
-    const endTimestamp   = nowMs();
+    const endTimestamp = nowMs();
     const startTimestamp = endTimestamp - lookbackDays * 24 * 60 * 60 * 1000;
     const requiredResolutions = ["1W", "1D", "4h", "15m", "3m"];
 
+    const settledCandles = await Promise.allSettled(
+      requiredResolutions.map(async (resolution) => [
+        resolution,
+        await getCandles({ instrumentName, resolution, startTimestamp, endTimestamp })
+      ])
+    );
     const candlesByResolution = Object.fromEntries(
-      (await Promise.allSettled(
-        requiredResolutions.map(async (resolution) => [
-          resolution,
-          await getCandles({ instrumentName, resolution, startTimestamp, endTimestamp })
-        ])
-      ))
-        .filter(r => r.status === "fulfilled")
-        .map(r => r.value)
+      settledCandles.filter(r => r.status === "fulfilled").map(r => r.value)
+    );
+
+    const dataQuality = buildDataQuality(
+      candlesByResolution,
+      requiredResolutions,
+      ["1D", "4h"]
     );
 
     const entryCandles = candlesByResolution["3m"] ?? [];
     const levelCandles = candlesByResolution["4h"] ?? [];
 
     const decision = makeRegimeDecision({ entryCandles, levelCandles, candlesByResolution, options });
-    sendJson(response, 200, { instrumentName, updatedAt: Date.now(), ...decision });
+
+    if (decision.regime === "unknown" || decision.regime == null) {
+      dataQuality.warnings.push("Regime kon niet worden bepaald — onvoldoende marktdata");
+      if (dataQuality.status === "ok") dataQuality.status = "incomplete";
+    }
+
+    sendJson(response, 200, {
+      instrumentName,
+      updatedAt: Date.now(),
+      dataQuality,
+      ...decision
+    });
     return;
   }
 
   if (url.pathname === "/api/optimize" && request.method === "POST") {
-    const body = await readJsonRequest(request);
+    const parsed = await safeReadJson(request);
+    if (!parsed.ok) { sendJson(response, 400, { error: parsed.error }); return; }
+    const body = parsed.value;
+
     const instrumentName = body.instrumentName ?? "BTC-PERPETUAL";
-    const strategyId     = body.strategyId ?? "support-resistance-v1";
+    const strategyId = body.strategyId ?? "support-resistance-v1";
     const strategy = findStrategy(strategyId);
     if (!strategy) {
       sendJson(response, 400, { error: `Onbekende strategie: ${strategyId}` });
       return;
     }
-    const rawLookback  = Number(body.lookbackDays ?? 90);
-    const lookbackDays = Number.isFinite(rawLookback) && rawLookback > 0 ? rawLookback : 90;
-    const oosPct       = Math.min(50, Math.max(5, Number(body.outOfSamplePct ?? 20)));
-    const paramGrid    = body.paramGrid ?? {};
+    const lookbackDays = parseLookbackDays(body.lookbackDays, 90);
+    const oosPct = Math.min(50, Math.max(5, Number(body.outOfSamplePct ?? 20)));
+    const paramGrid = body.paramGrid ?? {};
     const validDimensions = Object.keys(paramGrid).filter(k => Array.isArray(paramGrid[k]) && paramGrid[k].length > 0);
     if (!validDimensions.length) {
       sendJson(response, 400, { error: "Selecteer minimaal één parameterwaarde per dimensie." });
@@ -260,8 +356,8 @@ async function handleApi(request, response) {
 
     const entryResolution = strategy.chartResolution ?? "15m";
     const levelResolution = strategy.levelResolution ?? "4h";
-    const endTimestamp    = nowMs();
-    const startTimestamp  = endTimestamp - lookbackDays * 24 * 60 * 60 * 1000;
+    const endTimestamp = nowMs();
+    const startTimestamp = endTimestamp - lookbackDays * 24 * 60 * 60 * 1000;
     const uniqueResolutions = [...new Set(
       strategy.requiredResolutions?.length ? strategy.requiredResolutions : [entryResolution, levelResolution]
     )];
@@ -276,7 +372,7 @@ async function handleApi(request, response) {
 
     const entryCandles = candlesByResolution[entryResolution] ?? [];
     const levelCandles = candlesByResolution[levelResolution] ?? [];
-    const baseOptions  = body.baseOptions ?? {};
+    const baseOptions = body.baseOptions ?? {};
 
     const results = combos.map(paramCombo => {
       const options = { ...baseOptions, ...paramCombo, outOfSamplePct: oosPct };

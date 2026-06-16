@@ -25,7 +25,7 @@ npm start
 Open daarna `http://localhost:5173` in de browser.
 
 ```powershell
-npm test          # 77 unit-tests
+npm test          # 95 tests (unit + API integratie)
 ```
 
 ---

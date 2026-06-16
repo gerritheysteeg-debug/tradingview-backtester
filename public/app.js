@@ -74,6 +74,8 @@ const addAlertBtnEl = document.querySelector("#add-alert-btn");
 const alertsHintEl = document.querySelector("#alerts-hint");
 
 const dataQualityRowEl = document.querySelector("#data-quality-row");
+const adviceDataWarningEl = document.querySelector("#advice-data-warning");
+const regimeDataWarningEl = document.querySelector("#regime-data-warning");
 
 const tradeDetailPanelEl = document.querySelector("#trade-detail-panel");
 const tradeDetailTitleEl = document.querySelector("#trade-detail-title");
@@ -1714,6 +1716,16 @@ async function fetchRegimeDecision() {
 function renderRegimeDecision(result) {
   regimeSectionEl.classList.remove("hidden");
 
+  if (regimeDataWarningEl) {
+    const html = dataQualityWarningHtml(result.dataQuality);
+    if (html) {
+      regimeDataWarningEl.innerHTML = html;
+      regimeDataWarningEl.classList.remove("hidden");
+    } else {
+      regimeDataWarningEl.classList.add("hidden");
+    }
+  }
+
   const color = REGIME_COLORS[result.regime] ?? "#555";
   regimeBadgeEl.textContent = result.regimeLabel ?? result.regime;
   regimeBadgeEl.style.color = color;
@@ -1853,9 +1865,38 @@ function drawSetupOnChart(setup) {
   }
 }
 
+function dataQualityWarningHtml(dq) {
+  if (!dq || dq.status === "ok") return null;
+  const isInsufficient = dq.status === "insufficient";
+  const icon = isInsufficient ? "⛔" : "⚠️";
+  const title = isInsufficient
+    ? "Onvoldoende data — handelsadvies niet betrouwbaar"
+    : "Data gedeeltelijk beschikbaar — resultaten kunnen afwijken";
+  const items = (dq.warnings ?? []).map(w => `<li>${escapeHtml(w)}</li>`).join("");
+  return `<div class="data-warning ${isInsufficient ? "" : "incomplete"}">
+    <span class="warning-icon">${icon}</span>
+    <div><strong>${title}</strong>${items ? `<ul>${items}</ul>` : ""}</div>
+  </div>`;
+}
+
 function renderAdvice({ swing, day, scalp }) {
+  // Toon globale data-kwaliteitswaarschuwing als een van de scans onvoldoende data heeft
+  const worstDq = [swing.dataQuality, day.dataQuality, scalp.dataQuality]
+    .filter(Boolean)
+    .sort((a, b) => (a.status === "insufficient" ? -1 : b.status === "insufficient" ? 1 : 0))[0];
+  if (adviceDataWarningEl) {
+    const html = dataQualityWarningHtml(worstDq);
+    if (html) {
+      adviceDataWarningEl.innerHTML = html;
+      adviceDataWarningEl.classList.remove("hidden");
+    } else {
+      adviceDataWarningEl.classList.add("hidden");
+    }
+  }
+
+  const insufficient = worstDq?.status === "insufficient";
   const anySetup = swing.setups?.length || day.setups?.length || scalp.setups?.length;
-  adviceSectionEl.classList.toggle("hidden", !anySetup);
+  adviceSectionEl.classList.toggle("hidden", !anySetup && !insufficient);
   if (!anySetup) { clearAdviceLines(); return; }
 
   _lastAdviceData = { swing, day, scalp };

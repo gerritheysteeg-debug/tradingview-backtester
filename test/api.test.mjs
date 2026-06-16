@@ -158,6 +158,91 @@ test("POST /api/optimize with empty paramGrid returns 400", async () => {
   assert.ok(body.error?.length > 0, "expected an error message");
 });
 
+// ─── malformed JSON ───────────────────────────────────────────────────────────
+
+test("POST /api/backtest with malformed JSON returns 400", async () => {
+  const { status, body } = await new Promise((resolve, reject) => {
+    const payload = "{ not valid json";
+    const req = httpRequest(
+      `${BASE}/api/backtest`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", "content-length": Buffer.byteLength(payload) }
+      },
+      (res) => {
+        let data = "";
+        res.on("data", c => { data += c; });
+        res.on("end", () => {
+          try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+          catch { resolve({ status: res.statusCode, body: data }); }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.write(payload);
+    req.end();
+  });
+  assert.equal(status, 400);
+  assert.ok(body.error?.toLowerCase().includes("json"), `expected JSON error, got: ${body.error}`);
+});
+
+test("POST /api/optimize with malformed JSON returns 400", async () => {
+  const { status, body } = await new Promise((resolve, reject) => {
+    const payload = "{ broken";
+    const req = httpRequest(
+      `${BASE}/api/optimize`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", "content-length": Buffer.byteLength(payload) }
+      },
+      (res) => {
+        let data = "";
+        res.on("data", c => { data += c; });
+        res.on("end", () => {
+          try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+          catch { resolve({ status: res.statusCode, body: data }); }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.write(payload);
+    req.end();
+  });
+  assert.equal(status, 400);
+  assert.ok(body.error?.toLowerCase().includes("json"), `expected JSON error, got: ${body.error}`);
+});
+
+// ─── /api/candles validation ─────────────────────────────────────────────────
+
+test("GET /api/candles with invalid resolution returns 400", async () => {
+  const { status, body } = await get("/api/candles?instrument=BTC-PERPETUAL&resolution=99x&lookbackDays=1");
+  assert.equal(status, 400);
+  assert.ok(body.error?.includes("resolution"), `expected resolution error, got: ${body.error}`);
+});
+
+test("GET /api/candles with negative lookbackDays returns 400", async () => {
+  const { status, body } = await get("/api/candles?instrument=BTC-PERPETUAL&resolution=15m&lookbackDays=-5");
+  assert.equal(status, 400);
+  assert.ok(body.error?.toLowerCase().includes("lookback"), `expected lookback error, got: ${body.error}`);
+});
+
+test("GET /api/candles with empty instrument returns 400", async () => {
+  const { status, body } = await get("/api/candles?instrument=&resolution=15m&lookbackDays=1");
+  assert.equal(status, 400);
+  assert.ok(body.error?.toLowerCase().includes("instrument"), `expected instrument error, got: ${body.error}`);
+});
+
+// ─── data quality ─────────────────────────────────────────────────────────────
+
+test("GET /api/health includes supportedResolutions for client-side validation", async () => {
+  const { status, body } = await get("/api/health");
+  assert.equal(status, 200);
+  assert.ok(Array.isArray(body.supportedResolutions), "supportedResolutions should be array");
+  assert.ok(body.supportedResolutions.includes("15m"), "should include 15m");
+  assert.ok(body.supportedResolutions.includes("4h"),  "should include 4h");
+  assert.ok(body.supportedResolutions.includes("1D"),  "should include 1D");
+});
+
 // ─── 404 ──────────────────────────────────────────────────────────────────────
 
 test("unknown API route returns 404", async () => {
